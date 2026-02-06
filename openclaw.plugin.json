@@ -1,0 +1,53 @@
+{
+  "id": "wechat-miniprogram",
+  "name": "WeChat MiniProgram Plugin",
+  "description": "WeChat MiniProgram channel plugin for OpenClaw",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.ts",
+  "author": "OpenClaw Plugin Development",
+  "license": "MIT",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiKey": {
+        "type": "string",
+        "description": "API Key（格式：bot_id:secret）"
+      },
+      "pollIntervalMs": {
+        "type": "number",
+        "default": 2000,
+        "description": "轮询间隔（毫秒）"
+      },
+      "sessionKeyPrefix": {
+        "type": "string",
+        "default": "agent:main:wechat:miniprogram:",
+        "description": "Session Key 前缀"
+      },
+      "debug": {
+        "type": "boolean",
+        "default": false,
+        "description": "是否启用调试日志"
+      }
+    },
+    "required": ["apiKey"]
+  },
+  "openclaw": {
+    "channel": {
+      "id": "wechat-miniprogram",
+      "label": "WeChat MiniProgram",
+      "selectionLabel": "WeChat MiniProgram",
+      "blurb": "Bridge for OpenClaw to WeChat MiniProgram via HTTP polling",
+      "docsPath": "/channels/wechat-miniprogram",
+      "docsLabel": "wechat-miniprogram",
+      "systemImage": "bubble.left.and.text.bubble.right",
+      "aliases": ["wechat", "miniprogram", "wx"]
+    },
+    "install": {
+      "npmSpec": "@openclaw/wechat-miniprogram",
+      "localPath": "extensions/wechat-miniprogram",
+      "defaultChoice": "local"
+    }
+  }
+}
