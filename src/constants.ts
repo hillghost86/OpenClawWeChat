@@ -27,7 +27,7 @@ export const CHANNEL_ID = "wechat-miniprogram";
  * 中转服务器 URL（硬编码在代码中，不通过配置文件配置）
  * 这样升级时不需要修改配置文件
  */
-export const BRIDGE_URL = "http://127.0.0.1:8066";
+export const BRIDGE_URL = "https://api.clawchat.mifengcdn.com";
 
 /**
  * 配置默认值（与 openclaw.plugin.json 中的 configSchema.default 保持一致）
