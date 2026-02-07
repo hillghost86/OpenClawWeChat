@@ -1,6 +1,6 @@
 {
   "name": "openclawwechat",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "OpenClawWeChat - OpenClaw WeChat MiniProgram channel plugin",
   "keywords": [
     "openclaw",
@@ -41,7 +41,8 @@
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
     "version:major": "npm version major",
-    "config-init": "node scripts/config-init.js"
+    "config-init": "node scripts/config-init.js",
+    "uninstall": "node scripts/uninstall.js"
   },
   "devDependencies": {
     "openclaw": "workspace:*",

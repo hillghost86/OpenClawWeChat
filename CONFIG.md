@@ -1,14 +1,50 @@
-# WeChat MiniProgram 插件配置说明
+# OpenClawWeChat 插件配置说明
 
-## 📋 配置文件位置
+## 📋 快速开始
 
-OpenClaw 配置文件位于：`~/.openclaw/openclaw.json`
+### 🔑 获取 API Key
+
+在开始配置之前，你需要先获取 API Key：
+
+1. 打开微信小程序 **ClawChat**
+2. 进入我的页面 APIKey管理  复制API Key 
+3. 找到并复制你的 API Key（格式：`bot_id:secret`）
+
+> 💡 **提示：** API Key 是连接 OpenClaw 和微信小程序的凭证，请妥善保管。
+
+### 推荐方式：使用配置脚本（最简单）
+
+```bash
+npm run config-init
+# 或
+node scripts/config-init.js
+```
+
+脚本会引导你完成配置，**只保存你自定义的配置项**，使用默认值的配置不会写入文件。
+
+### 手动配置
+
+配置文件位置：`~/.openclaw/openclaw.json`
 
 ## ⚙️ 配置项说明
 
-### 必需配置
+| 配置项 | 类型 | 必需 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| `apiKey` | string | ✅ 是 | `YOUR_API_KEY_HERE` | API Key（格式：`bot_id:secret`） |
+| `pollIntervalMs` | number | ❌ 否 | `2000` | 轮询间隔（毫秒） |
+| `sessionKeyPrefix` | string | ❌ 否 | `agent:main:wechat:miniprogram:` | Session Key 前缀 |
+| `debug` | boolean | ❌ 否 | `false` | 是否启用调试日志 |
 
-在 `plugins.entries.openclawwechat.config` 中添加以下配置：
+**重要提示：**
+- ✅ **只配置需要自定义的项**，使用默认值的配置**不需要写入**配置文件
+- ✅ OpenClaw 会自动从插件清单中读取默认值
+- ✅ 配置文件更简洁，只显示你自定义的配置
+
+## 📝 配置示例
+
+### 最小配置（推荐）
+
+如果你只配置 API Key，其他使用默认值：
 
 ```json
 {
@@ -17,10 +53,7 @@ OpenClaw 配置文件位于：`~/.openclaw/openclaw.json`
       "openclawwechat": {
         "enabled": true,
         "config": {
-          "apiKey": "20231227:9HkPUB2HzCyQVtKs6Z0M3ICe9NiM84fedLV",
-          "pollIntervalMs": 2000,
-          "sessionKeyPrefix": "agent:main:wechat:miniprogram:",
-          "debug": false
+          "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
         }
       }
     }
@@ -28,174 +61,85 @@ OpenClaw 配置文件位于：`~/.openclaw/openclaw.json`
 }
 ```
 
-### 配置项说明
+### 自定义部分配置
 
-| 配置项 | 类型 | 必需 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `apiKey` | string | 是 | - | API Key（格式：`bot_id:secret`） |
-| `pollIntervalMs` | number | 否 | `2000` | 轮询间隔（毫秒） |
-| `sessionKeyPrefix` | string | 否 | `agent:main:wechat:miniprogram:` | Session Key 前缀 |
-| `debug` | boolean | 否 | `false` | 是否启用调试日志 |
+如果你修改了轮询间隔：
 
-**注意**：
-- `bridgeUrl`（中转服务器 URL）已硬编码在代码中（`http://127.0.0.1:8066`），无需在配置文件中配置
-- 这样设计是为了方便升级，避免每次升级都需要修改配置文件
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclawwechat": {
+        "enabled": true,
+        "config": {
+          "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345",
+          "pollIntervalMs": 3000
+        }
+      }
+    }
+  }
+}
+```
 
-### API Key 格式
+### 自定义多个配置
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclawwechat": {
+        "enabled": true,
+        "config": {
+          "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345",
+          "pollIntervalMs": 3000,
+          "debug": true
+        }
+      }
+    }
+  }
+}
+```
+
+## 🔑 API Key 格式
+
+**获取方式：** API Key 需要从**微信小程序 ClawChat** 中获取。
 
 API Key 格式：`<bot_id>:<secret>`
 
-示例：`20231227:9HkPUB2HzCyQVtKs6Z0M3ICe9NiM84fedLV`
+**示例：** `20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345`
 
-- `bot_id`: 数字，格式为 `20231226 + 主键ID`（例如：主键ID=1，则 bot_id=20231227）
+- `bot_id`: 数字id
 - `secret`: 35 位随机字符串
 
-## 📝 完整配置示例
+> 💡 **提示：** 打开微信小程序 ClawChat，在设置或账户页面可以找到你的 API Key。
 
-基于你的原始配置，添加 `openclawwechat` 配置后的完整配置：
+## 🔧 配置方法
 
-```json
-{
-  "meta": {
-    "lastTouchedVersion": "2026.2.3",
-    "lastTouchedAt": "2026-02-05T07:16:51.991Z"
-  },
-  "wizard": {
-    "lastRunAt": "2026-02-05T07:16:51.437Z",
-    "lastRunVersion": "2026.2.3",
-    "lastRunCommand": "onboard",
-    "lastRunMode": "local"
-  },
-  "auth": {
-    "profiles": {
-      "zai:default": {
-        "provider": "zai",
-        "mode": "api_key"
-      }
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "zai/glm-4.7"
-      },
-      "models": {
-        "zai/glm-4.7": {
-          "alias": "GLM"
-        }
-      },
-      "workspace": "/Users/ma/.openclaw/workspace",
-      "maxConcurrent": 4,
-      "subagents": {
-        "maxConcurrent": 8
-      }
-    }
-  },
-  "commands": {
-    "native": "auto",
-    "nativeSkills": "auto"
-  },
-  "channels": {
-    "telegram": {
-      "enabled": true,
-      "dmPolicy": "allowlist",
-      "botToken": "8534528003:AAF8VbWqiG1ZYWpymfseQMNLQcvezGZlikM",
-      "allowFrom": [
-        "865730955"
-      ],
-      "groupPolicy": "allowlist",
-      "streamMode": "partial"
-    }
-  },
-  "gateway": {
-    "port": 18789,
-    "mode": "local",
-    "bind": "loopback",
-    "auth": {
-      "mode": "token",
-      "token": "65ec861c4cba1b644da58c3112b2de5700b94427ca4e0f8d"
-    },
-    "tailscale": {
-      "mode": "off",
-      "resetOnExit": false
-    }
-  },
-  "skills": {
-    "install": {
-      "nodeManager": "npm"
-    }
-  },
-  "messages": {
-    "ackReactionScope": "group-mentions"
-  },
-  "plugins": {
-    "entries": {
-      "telegram": {
-        "enabled": true
-      },
-      "openclawwechat": {
-        "enabled": true,
-        "config": {
-          "apiKey": "20231227:9HkPUB2HzCyQVtKs6Z0M3ICe9NiM84fedLV",
-          "pollIntervalMs": 2000,
-          "sessionKeyPrefix": "agent:main:wechat:miniprogram:",
-          "debug": false
-        }
-      }
-    }
-  }
-}
+### 方法 1：使用配置脚本（推荐）
+
+```bash
+# 在插件目录下运行
+npm run config-init
+# 或
+node scripts/config-init.js
 ```
 
-## 🔧 配置更新方法
+脚本会：
+- ✅ 交互式引导配置
+- ✅ 验证 API Key 格式
+- ✅ 自动过滤默认值
+- ✅ 只保存你自定义的配置
 
-### 方法 1：手动编辑配置文件
+### 方法 2：手动编辑配置文件
 
 ```bash
 # 编辑配置文件
 nano ~/.openclaw/openclaw.json
-
-# 或使用其他编辑器
+# 或
 code ~/.openclaw/openclaw.json
 ```
 
-### 方法 2：使用脚本更新
-
-```bash
-# 使用 Python 脚本更新配置
-python3 << 'EOF'
-import json
-
-CONFIG_FILE = "/Users/ma/.openclaw/openclaw.json"
-API_KEY = "20231227:9HkPUB2HzCyQVtKs6Z0M3ICe9NiM84fedLV"
-
-# 读取配置
-with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-  config = json.load(f)
-
-# 添加 openclawwechat 配置
-if 'plugins' not in config:
-  config['plugins'] = {}
-if 'entries' not in config['plugins']:
-  config['plugins']['entries'] = {}
-
-config['plugins']['entries']['openclawwechat'] = {
-  'enabled': True,
-  'config': {
-    'apiKey': API_KEY,
-    'pollIntervalMs': 2000,
-    'sessionKeyPrefix': 'agent:main:wechat:miniprogram:',
-    'debug': False
-  }
-}
-
-# 写回配置
-with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-  json.dump(config, f, ensure_ascii=False, indent=2)
-
-print("✅ 配置已更新")
-EOF
-```
+**提示：** 手动编辑时，只需添加需要自定义的配置项，默认值不需要写入。
 
 ## ✅ 验证配置
 
@@ -211,7 +155,17 @@ openclaw gateway restart
 openclaw logs --follow | grep "openclawwechat"
 ```
 
+进入小程序，查看链接状态，或者测试发送。
+
+## 💡 配置最佳实践
+
+1. **使用配置脚本**：推荐使用 `config-init.js` 脚本，避免手动编辑错误
+2. **最小化配置**：只配置需要自定义的项，让配置文件保持简洁
+3. **默认值管理**：默认值由插件清单统一管理，修改默认值时只需更新 `openclaw.plugin.json`
+4. **配置验证**：配置脚本会自动验证 API Key 格式，确保配置正确
+
 ## 📚 相关文档
 
 - [README.md](./README.md) - 插件使用说明
-- [插件开发指南](../PLUGIN_DEVELOPMENT_GUIDE.md) - 开发文档
+- [CONFIG-INIT.md](./CONFIG-INIT.md) - 配置脚本使用指南
+- [INSTALL.md](./INSTALL.md) - 安装指南

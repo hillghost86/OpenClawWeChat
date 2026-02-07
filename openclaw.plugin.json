@@ -2,7 +2,7 @@
   "id": "openclawwechat",
   "name": "OpenClawWeChat",
   "description": "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "main": "index.ts",
   "author": "OpenClaw Plugin Development",

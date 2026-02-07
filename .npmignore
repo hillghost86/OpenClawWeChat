@@ -1,0 +1,46 @@
+# 开发文件
+.git/
+.gitignore
+.DS_Store
+*.log
+
+# 构建产物
+dist/
+*.tsbuildinfo
+
+# 安装脚本（不需要发布到 npm）
+install.sh
+install.py
+
+# 开发文档（可选，如果不想包含在 npm 包中）
+# PLUGIN_DEVELOPMENT_GUIDE.md
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试文件（如果有）
+test/
+tests/
+*.test.ts
+*.spec.ts
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 依赖
+node_modules/
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 发布脚本
+publish.sh
+

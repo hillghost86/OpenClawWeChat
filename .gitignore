@@ -3,3 +3,9 @@ dist/
 *.log
 .DS_Store
 *.tsbuildinfo
+
+# 发布脚本
+./publish.sh
+
+# npm包文件
+*.tgz

@@ -1,13 +1,11 @@
 # OpenClawWeChat
 
-OpenClawWeChat 是 OpenClaw 的微信小程序 Channel Plugin，通过 HTTP 轮询方式实现 OpenClaw 与微信小程序之间的消息桥接。
-
+OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpneClaw 与个人微信之间进行通讯会话。
 ## ✨ 功能特性
 
 - ✅ **文本消息**：支持发送和接收文本消息
 - ✅ **媒体消息**：支持图片等媒体消息的发送
-- ✅ **消息回复**：支持消息回复功能（reply_to_message_id）
-- ✅ **轮询服务**：通过 HTTP 轮询获取新消息
+- ✅ **消息回复**：支持消息回复功能
 - ✅ **Telegram Bot API 兼容**：使用 Telegram Bot API 兼容格式
 - ✅ **错误处理**：完整的错误处理和日志记录
 - ✅ **状态管理**：支持账户状态查询和管理
@@ -16,40 +14,112 @@ OpenClawWeChat 是 OpenClaw 的微信小程序 Channel Plugin，通过 HTTP 轮�
 
 - OpenClaw Gateway 已安装并运行
 - 有效的 API Key（格式：`bot_id:secret`）
+  - 💡 **获取方式：** 打开微信小程序 **ClawChat**，在我的页面 APIKey管理 复制你的 API Key
 
 ## 🚀 快速开始
 
-### 1. 安装插件
+### 方法一：从 GitHub 安装（手动安装）
 
-#### 方式一：从本地安装
+#### 步骤 1：进入插件目录
+
+**macOS / Linux：**
+```bash
+cd ~/.openclaw/extensions
+```
+
+**Windows：**
+```powershell
+# PowerShell
+cd $env:USERPROFILE\.openclaw\extensions
+```
+
+```cmd
+# CMD
+cd %USERPROFILE%\.openclaw\extensions
+```
+
+#### 步骤 2：克隆仓库
 
 ```bash
-# 复制插件到 OpenClaw 扩展目录
-cp -r OpenClawWeChat ~/.openclaw/extensions/OpenClawWeChat
+git clone https://github.com/hillghost86/OpenClawWeChat.git
+cd OpenClawWeChat
+```
 
-# 启用插件
-openclaw plugins enable openclawwechat
+#### 步骤 3：修改配置
 
-# 重启 Gateway
+编辑 OpenClaw 配置文件，添加插件配置（见下方"配置插件"部分）。
+
+### 方法二：从 NPM 安装
+
+```bash
+# 安装最新版本
+openclaw plugins install openclawwechat
+
+# 安装特定版本
+openclaw plugins install openclawwechat@1.0.0
+```
+
+**重要提示：** 安装后需要手动配置插件。请参考下方"配置插件"部分。
+
+### 卸载插件
+
+**注意：** OpenClaw 目前不支持 `openclaw plugins uninstall` 命令，需要使用以下方法：
+
+```bash
+# 方法 1：使用 npm 脚本（推荐，会删除配置和插件目录）
+cd ~/.openclaw/extensions/openclawwechat
+npm run uninstall
+```
+
+卸载脚本会：
+1. 从配置文件中删除插件配置
+2. 删除插件目录（`~/.openclaw/extensions/openclawwechat`）
+
+**手动卸载：**
+
+如果无法运行卸载脚本，可以手动删除：
+
+```bash
+# 1. 删除插件目录
+rm -rf ~/.openclaw/extensions/openclawwechat
+
+# 2. 编辑配置文件，删除插件配置
+# 编辑 ~/.openclaw/openclaw.json，删除 plugins.entries.openclawwechat 项
+
+# 3. 重启 Gateway
 openclaw gateway restart
 ```
 
-#### 方式二：从 GitHub 安装
+### 配置插件
 
+#### 使用配置脚本（推荐）
+
+**macOS / Linux：**
 ```bash
-# 克隆仓库
-git clone git@github.com:hillghost86/OpenClawWeChat.git ~/.openclaw/extensions/OpenClawWeChat
-
-# 启用插件
-openclaw plugins enable openclawwechat
-
-# 重启 Gateway
-openclaw gateway restart
+cd ~/.openclaw/extensions/openclawwechat
+npm run config-init
 ```
 
-### 2. 配置插件
+**Windows：**
+```powershell
+# PowerShell
+cd $env:USERPROFILE\.openclaw\extensions\openclawwechat
+npm run config-init
+```
 
-编辑 OpenClaw 配置文件 `~/.openclaw/openclaw.json`：
+```cmd
+# CMD
+cd %USERPROFILE%\.openclaw\extensions\openclawwechat
+npm run config-init
+```
+
+#### 手动编辑配置文件
+
+**macOS / Linux：** `~/.openclaw/openclaw.json`
+
+**Windows：** `%USERPROFILE%\.openclaw\openclaw.json` 或 `C:\Users\<用户名>\.openclaw\openclaw.json`
+
+添加以下配置：
 
 ```json
 {
@@ -58,10 +128,7 @@ openclaw gateway restart
       "openclawwechat": {
         "enabled": true,
         "config": {
-          "apiKey": "your_bot_id:your_secret",
-          "pollIntervalMs": 2000,
-          "sessionKeyPrefix": "agent:main:wechat:miniprogram:",
-          "debug": false
+          "apiKey": "your_bot_id:your_secret"
         }
       }
     }
@@ -69,7 +136,13 @@ openclaw gateway restart
 }
 ```
 
-### 3. 验证安装
+### 重启 Gateway
+
+```bash
+openclaw gateway restart
+```
+
+### 验证安装
 
 ```bash
 # 查看插件状态
@@ -78,6 +151,8 @@ openclaw plugins list
 # 查看日志
 openclaw logs --follow | grep "openclawwechat"
 ```
+
+### 查看小程序会话界面是否已链接OpenClaw
 
 ## ⚙️ 配置说明
 
@@ -94,9 +169,11 @@ openclaw logs --follow | grep "openclawwechat"
 
 #### 最小配置
 
+> 💡 **获取 API Key：** 打开微信小程序 ClawChat，在设置或账户页面可以找到你的 API Key。
+
 ```json
 {
-  "apiKey": "20231227:ABC123XYZ789DEF456GHI012JKL345MNO678PQR901STU234VWX567"
+  "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
 }
 ```
 
@@ -104,7 +181,7 @@ openclaw logs --follow | grep "openclawwechat"
 
 ```json
 {
-  "apiKey": "20231227:ABC123XYZ789DEF456GHI012JKL345MNO678PQR901STU234VWX567",
+  "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345",
   "pollIntervalMs": 2000,
   "sessionKeyPrefix": "agent:main:wechat:miniprogram:",
   "debug": false
@@ -118,6 +195,8 @@ OpenClawWeChat/
 ├── README.md              # 本文件
 ├── CONFIG.md              # 详细配置说明
 ├── EXAMPLE.md             # 使用示例
+├── install.sh             # Bash 安装脚本
+├── install.py             # Python 安装脚本（跨平台）
 ├── openclaw.plugin.json   # 插件清单文件（必需）
 ├── package.json           # NPM 包配置
 ├── tsconfig.json          # TypeScript 配置
@@ -148,6 +227,24 @@ npm run build
 # 开发模式（监听文件变化）
 npm run dev
 ```
+
+### 测试 npm 包（发布前）
+
+在发布到 npm 之前，建议先进行本地测试：
+
+```bash
+# 1. 预览打包内容
+./test-pack.sh
+
+# 2. 本地完整测试（打包、安装、验证）
+./test-local.sh
+
+# 3. 手动测试安装
+npm pack
+openclaw plugins install ./openclaw-openclawwechat-1.0.0.tgz
+```
+
+详细测试说明请查看 [TEST.md](./TEST.md)
 
 ### 核心实现
 
@@ -283,6 +380,7 @@ await openclaw.sendMessage(replyMessage);
 - [使用示例](./EXAMPLE.md)
 - [OpenClaw 插件开发指南](https://docs.openclaw.ai/plugins)
 
+
 ## 📝 版本历史
 
 ### v1.0.0
@@ -292,6 +390,7 @@ await openclaw.sendMessage(replyMessage);
 - 支持消息回复功能
 - HTTP 轮询服务
 - 完整的错误处理
+- NPM 发布支持
 
 ## 📄 许可证
 
