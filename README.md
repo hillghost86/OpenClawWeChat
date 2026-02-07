@@ -4,7 +4,7 @@ OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpneClaw 与个人微
 ## ✨ 功能特性
 
 - ✅ **文本消息**：支持发送和接收文本消息
-- ✅ **媒体消息**：支持图片等媒体消息的发送
+- ✅ **媒体消息**：支持图片等媒体文件，支持发送pdf，word等文档文件的发送
 - ✅ **消息回复**：支持消息回复功能
 - ✅ **Telegram Bot API 兼容**：使用 Telegram Bot API 兼容格式
 - ✅ **错误处理**：完整的错误处理和日志记录
@@ -13,12 +13,23 @@ OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpneClaw 与个人微
 ## 📋 前置要求
 
 - OpenClaw Gateway 已安装并运行
+  - 安装见openclaw官网 https://openclaw.ai
 - 有效的 API Key（格式：`bot_id:secret`）
   - 💡 **获取方式：** 打开微信小程序 **ClawChat**，在我的页面 APIKey管理 复制你的 API Key
 
-## 🚀 快速开始
+## 🚀 安装插件
 
-### 方法一：从 GitHub 安装（手动安装）
+### 方法一：从 NPM 自动安装 （推荐）
+
+```bash
+# 安装最新版本
+openclaw plugins install openclawwechat
+
+# 安装完插件，OpenClaw会报错，这是正常的，应为还没有写配置文件。
+```
+编辑 OpenClaw 配置文件，添加插件配置（见下方"配置插件"部分）。
+
+### 方法二：从 GitHub 安装（手动安装）
 
 #### 步骤 1：进入插件目录
 
@@ -45,81 +56,64 @@ git clone https://github.com/hillghost86/OpenClawWeChat.git
 cd OpenClawWeChat
 ```
 
-#### 步骤 3：修改配置
+## 配置插件
 
-编辑 OpenClaw 配置文件，添加插件配置（见下方"配置插件"部分）。
+### 方法一：使用配置脚本（推荐）
 
-### 方法二：从 NPM 安装
-
-```bash
-# 安装最新版本
-openclaw plugins install openclawwechat
-
-# 安装特定版本
-openclaw plugins install openclawwechat@1.0.0
-```
-
-**重要提示：** 安装后需要手动配置插件。请参考下方"配置插件"部分。
-
-### 卸载插件
-
-**注意：** OpenClaw 目前不支持 `openclaw plugins uninstall` 命令，需要使用以下方法：
-
-```bash
-# 方法 1：使用 npm 脚本（推荐，会删除配置和插件目录）
-cd ~/.openclaw/extensions/openclawwechat
-npm run uninstall
-```
-
-卸载脚本会：
-1. 从配置文件中删除插件配置
-2. 删除插件目录（`~/.openclaw/extensions/openclawwechat`）
-
-**手动卸载：**
-
-如果无法运行卸载脚本，可以手动删除：
-
-```bash
-# 1. 删除插件目录
-rm -rf ~/.openclaw/extensions/openclawwechat
-
-# 2. 编辑配置文件，删除插件配置
-# 编辑 ~/.openclaw/openclaw.json，删除 plugins.entries.openclawwechat 项
-
-# 3. 重启 Gateway
-openclaw gateway restart
-```
-
-### 配置插件
-
-#### 使用配置脚本（推荐）
+使用 npm 脚本进行交互式配置：
 
 **macOS / Linux：**
 ```bash
+# 进入插件目录
 cd ~/.openclaw/extensions/openclawwechat
+
+# npm运行配置脚本
 npm run config-init
+
+# 或者使用node运行配置脚本
+node ~/.openclaw/extensions/openclawwechatscripts/scripts/config-init.js
 ```
 
-**Windows：**
+**Windows：**  powershell 方法
 ```powershell
 # PowerShell
 cd $env:USERPROFILE\.openclaw\extensions\openclawwechat
 npm run config-init
+
+# 或使用node运行配置脚本
+node $env:USERPROFILE\.openclaw\extensions\openclawwechat\scripts\config-init.js
 ```
 
+CMD 方法
 ```cmd
 # CMD
 cd %USERPROFILE%\.openclaw\extensions\openclawwechat
 npm run config-init
+
+或使用node运行配置脚本
+
+```cmd
+# CMD
+node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\config-init.js
 ```
 
-#### 手动编辑配置文件
 
-**macOS / Linux：** `~/.openclaw/openclaw.json`
+配置脚本会：
+- ✅ 引导你输入 API Key（从微信小程序 ClawChat 获取）
+- ✅ 询问是否需要自定义其他配置项
+- ✅ 只保存自定义的配置（使用默认值的配置不会写入文件）
+- ✅ 自动验证配置格式
 
-**Windows：** `%USERPROFILE%\.openclaw\openclaw.json` 或 `C:\Users\<用户名>\.openclaw\openclaw.json`
+### 方法二：手动编辑配置文件
 
-添加以下配置：
+**配置文件位置：**
+
+- **macOS / Linux：** `~/.openclaw/openclaw.json`
+- **Windows：** `%USERPROFILE%\.openclaw\openclaw.json` 或 `C:\Users\<用户名>\.openclaw\openclaw.json`
+
+**最小配置（推荐）：**
+
+如果你只配置 API Key，其他使用默认值：
 
 ```json
 {
@@ -135,6 +129,17 @@ npm run config-init
   }
 }
 ```
+
+> 💡 **提示：** 
+> - API Key 可从**微信小程序 ClawChat** 中获取（我的页面 → APIKey管理）
+> - 只配置需要自定义的项，使用默认值的配置**不需要写入**配置文件
+> - OpenClaw 会自动从插件清单中读取默认值
+
+
+
+#### 步骤 3：配置插件
+
+安装完成后，需要配置插件。请参考下方"配置插件"部分。
 
 ### 重启 Gateway
 
@@ -187,64 +192,61 @@ openclaw logs --follow | grep "openclawwechat"
   "debug": false
 }
 ```
+### 卸载插件
 
-## 📁 项目结构
-
-```
-OpenClawWeChat/
-├── README.md              # 本文件
-├── CONFIG.md              # 详细配置说明
-├── EXAMPLE.md             # 使用示例
-├── install.sh             # Bash 安装脚本
-├── install.py             # Python 安装脚本（跨平台）
-├── openclaw.plugin.json   # 插件清单文件（必需）
-├── package.json           # NPM 包配置
-├── tsconfig.json          # TypeScript 配置
-├── index.ts               # 插件入口文件（必需）
-└── src/
-    ├── channel.ts         # Channel Plugin 核心实现
-    ├── runtime.ts         # Runtime 管理
-    ├── polling.ts         # 轮询服务实现
-    ├── message-parser.ts  # 消息解析器
-    ├── message-injector.ts # 消息注入器
-    ├── reply-sender.ts    # 回复发送器
-    ├── media-handler.ts   # 媒体消息处理
-    ├── config.ts          # 配置管理
-    └── constants.ts       # 常量定义
-```
-
-## 🔧 开发指南
-
-### 构建项目
+**Mac/Linux**
 
 ```bash
-# 安装依赖
-npm install
+# 方法 1：使用 npm 脚本（推荐，会删除配置和插件目录）
+cd ~/.openclaw/extensions/openclawwechat
+npm run uninstall
 
-# 编译 TypeScript
-npm run build
-
-# 开发模式（监听文件变化）
-npm run dev
+# 或使用node卸载
+node ~/.openclaw/extensions/openclawwechat/scripts/uninstall.js
 ```
 
-### 测试 npm 包（发布前）
+**Windows：**  powershell 方法
+```powershell
+# PowerShell
+cd $env:USERPROFILE\.openclaw\extensions\openclawwechat
+npm run uninstall
 
-在发布到 npm 之前，建议先进行本地测试：
+# 或使用node运行配置脚本
+node $env:USERPROFILE\.openclaw\extensions\openclawwechat\scripts\unistall.js
+```
+
+CMD 方法
+```cmd
+# CMD
+cd %USERPROFILE%\.openclaw\extensions\openclawwechat
+npm run unistall
+
+或使用node运行配置脚本
+
+```cmd
+# CMD
+node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\unistall.js
+```
+
+卸载脚本会：
+1. 从配置文件中删除插件配置
+2. 删除插件目录（`~/.openclaw/extensions/openclawwechat`）
+
+**手动卸载：**
+
+如果无法运行卸载脚本，可以手动删除：
 
 ```bash
-# 1. 预览打包内容
-./test-pack.sh
+# 1. 删除插件目录
+rm -rf ~/.openclaw/extensions/openclawwechat
 
-# 2. 本地完整测试（打包、安装、验证）
-./test-local.sh
+# 2. 编辑配置文件，删除插件配置
+# 编辑 ~/.openclaw/openclaw.json，删除 plugins.entries.openclawwechat 项
 
-# 3. 手动测试安装
-npm pack
-openclaw plugins install ./openclaw-openclawwechat-1.0.0.tgz
+# 3. 重启 Gateway
+openclaw gateway restart
 ```
 
-详细测试说明请查看 [TEST.md](./TEST.md)
 
 ### 核心实现
 
@@ -353,13 +355,12 @@ await openclaw.sendMessage(replyMessage);
 
 2. **消息发送失败**
    - 检查 API Key 是否正确
-   - 确认中转服务器是否正常运行
    - 检查网络连接
 
 3. **轮询未工作**
-   - 检查 `pollIntervalMs` 配置
+   - 检查 `pollIntervalMs` 配置,默认是2000ms
    - 查看轮询服务日志
-   - 确认中转服务器 API 端点可访问
+
 
 ### 调试模式
 
@@ -377,24 +378,8 @@ await openclaw.sendMessage(replyMessage);
 ## 📖 相关文档
 
 - [详细配置说明](./CONFIG.md)
-- [使用示例](./EXAMPLE.md)
 - [OpenClaw 插件开发指南](https://docs.openclaw.ai/plugins)
 
-
-## 📝 版本历史
-
-### v1.0.0
-
-- 初始版本发布
-- 支持文本和媒体消息
-- 支持消息回复功能
-- HTTP 轮询服务
-- 完整的错误处理
-- NPM 发布支持
-
-## 📄 许可证
-
-MIT License
 
 ## 🤝 贡献
 
