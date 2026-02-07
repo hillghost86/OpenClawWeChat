@@ -1,6 +1,11 @@
 # OpenClawWeChat
 
 OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpneClaw 与个人微信之间进行通讯会话。
+
+众所周知的原因，中中国大陆无法使用Teletegram，Whatapp等工具与Opencalw会话，虽然可以使用飞书、钉钉但配置起来也比较负责。而国名第一大app微信，却只支持企业微信，不支持个人微信。
+
+OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程序进行链接，可以直接通过微信小程序与OpenClaw进行对话，让OpenClaw做你让他做的事情。并且可以随时随地获得OpenClaw的回复。
+
 ## ✨ 功能特性
 
 - ✅ **文本消息**：支持发送和接收文本消息
@@ -15,9 +20,9 @@ OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpneClaw 与个人微
 - OpenClaw Gateway 已安装并运行
   - 安装见openclaw官网 https://openclaw.ai
 - 有效的 API Key（格式：`bot_id:secret`）
-  - 💡 **获取方式：** 打开微信小程序 **ClawChat**，在我的页面 APIKey管理 复制你的 API Key
+  - 💡 **获取方式：** 打开微信，搜索小程序 **ClawChat**，在我的页面 APIKey管理 复制你的 API Key
 
-## 🚀 安装插件
+## 🚀 一、安装插件
 
 ### 方法一：从 NPM 自动安装 （推荐）
 
@@ -25,7 +30,7 @@ OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpneClaw 与个人微
 # 安装最新版本
 openclaw plugins install openclawwechat
 
-# 安装完插件，OpenClaw会报错，这是正常的，应为还没有写配置文件。
+# 安装完插件，OpenClaw会报错，这是正常的，因为还没有写配置文件。
 ```
 编辑 OpenClaw 配置文件，添加插件配置（见下方"配置插件"部分）。
 
@@ -56,7 +61,7 @@ git clone https://github.com/hillghost86/OpenClawWeChat.git
 cd OpenClawWeChat
 ```
 
-## 配置插件
+## 二、配置插件
 
 ### 方法一：使用配置脚本（推荐）
 
@@ -137,9 +142,7 @@ node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\config-init.js
 
 
 
-#### 步骤 3：配置插件
-
-安装完成后，需要配置插件。请参考下方"配置插件"部分。
+## 三、重启插件并验证
 
 ### 重启 Gateway
 
@@ -157,9 +160,9 @@ openclaw plugins list
 openclaw logs --follow | grep "openclawwechat"
 ```
 
-### 查看小程序会话界面是否已链接OpenClaw
+进入CLawChat 微信小程序 ，查看小程序会话界面是否已链接OpenClaw。
 
-## ⚙️ 配置说明
+## ⚙️ 四、配置说明
 
 ### 配置项
 
@@ -192,7 +195,7 @@ openclaw logs --follow | grep "openclawwechat"
   "debug": false
 }
 ```
-### 卸载插件
+## 五、卸载插件
 
 **Mac/Linux**
 
@@ -248,7 +251,7 @@ openclaw gateway restart
 ```
 
 
-### 核心实现
+## 六、核心实现
 
 #### 1. 插件入口 (index.ts)
 
@@ -303,46 +306,6 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
 }
 ```
 
-## 📚 使用示例
-
-### 发送文本消息
-
-```typescript
-// 通过 OpenClaw API 发送消息
-const target = "openclawwechat:openid123";
-const message = {
-  content: "Hello, WeChat MiniProgram!",
-  target: target
-};
-
-// 使用 OpenClaw 的 sendMessage API
-await openclaw.sendMessage(message);
-```
-
-### 发送媒体消息
-
-```typescript
-const mediaMessage = {
-  content: "图片消息",
-  media_type: "image",
-  media_url: "https://example.com/image.jpg",
-  target: "openclawwechat:openid123"
-};
-
-await openclaw.sendMessage(mediaMessage);
-```
-
-### 回复消息
-
-```typescript
-const replyMessage = {
-  content: "这是回复",
-  reply_to_message_id: 12345,
-  target: "openclawwechat:openid123"
-};
-
-await openclaw.sendMessage(replyMessage);
-```
 
 ## 🔍 故障排查
 
