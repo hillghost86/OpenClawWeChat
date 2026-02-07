@@ -11,17 +11,17 @@
  * - openclaw.plugin.json
  * - index.ts（引用此常量）
  */
-export const PLUGIN_VERSION = "1.0.0";
+export const PLUGIN_VERSION = "1.0.1";
 
 /**
  * 插件 ID（必须与 openclaw.plugin.json 中的 id 一致）
  */
-export const PLUGIN_ID = "wechat-miniprogram";
+export const PLUGIN_ID = "openclawwechat";
 
 /**
  * Channel ID（必须与 openclaw.plugin.json 中的 openclaw.channel.id 一致）
  */
-export const CHANNEL_ID = "wechat-miniprogram";
+export const CHANNEL_ID = "openclawwechat";
 
 /**
  * 中转服务器 URL（硬编码在代码中，不通过配置文件配置）

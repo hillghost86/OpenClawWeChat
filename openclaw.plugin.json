@@ -1,7 +1,7 @@
 {
-  "id": "wechat-miniprogram",
-  "name": "WeChat MiniProgram Plugin",
-  "description": "WeChat MiniProgram channel plugin for OpenClaw",
+  "id": "openclawwechat",
+  "name": "OpenClawWeChat",
+  "description": "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
   "version": "1.0.0",
   "type": "module",
   "main": "index.ts",
@@ -35,18 +35,18 @@
   },
   "openclaw": {
     "channel": {
-      "id": "wechat-miniprogram",
-      "label": "WeChat MiniProgram",
-      "selectionLabel": "WeChat MiniProgram",
+      "id": "openclawwechat",
+      "label": "OpenClawWeChat",
+      "selectionLabel": "OpenClawWeChat",
       "blurb": "Bridge for OpenClaw to WeChat MiniProgram via HTTP polling",
-      "docsPath": "/channels/wechat-miniprogram",
-      "docsLabel": "wechat-miniprogram",
+      "docsPath": "/channels/openclawwechat",
+      "docsLabel": "openclawwechat",
       "systemImage": "bubble.left.and.text.bubble.right",
       "aliases": ["wechat", "miniprogram", "wx"]
     },
     "install": {
-      "npmSpec": "@openclaw/wechat-miniprogram",
-      "localPath": "extensions/wechat-miniprogram",
+      "npmSpec": "@openclaw/openclawwechat",
+      "localPath": "extensions/OpenClawWeChat",
       "defaultChoice": "local"
     }
   }

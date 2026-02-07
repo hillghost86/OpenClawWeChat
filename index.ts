@@ -15,8 +15,8 @@ import { PLUGIN_ID, PLUGIN_VERSION } from "./src/constants.js";
 
 const plugin = {
   id: PLUGIN_ID,
-  name: "WeChat MiniProgram",
-  description: "WeChat MiniProgram channel plugin for OpenClaw",
+  name: "OpenClawWeChat",
+  description: "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
   version: PLUGIN_VERSION,
   
   // 配置 Schema

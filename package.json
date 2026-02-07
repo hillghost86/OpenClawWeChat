@@ -1,7 +1,7 @@
 {
-  "name": "@openclaw/wechat-miniprogram",
+  "name": "@openclaw/openclawwechat",
   "version": "1.0.0",
-  "description": "OpenClaw WeChat MiniProgram channel plugin",
+  "description": "OpenClawWeChat - OpenClaw WeChat MiniProgram channel plugin",
   "type": "module",
   "main": "index.ts",
   "scripts": {

@@ -18,6 +18,7 @@ import type {
   ChannelGateway,
   ChannelMeta,
 } from "openclaw/plugin-sdk";
+import { resolveMediaPath } from "./media-handler.js";
 import { getWechatMiniprogramRuntime } from "./runtime.js";
 import { startPollingService } from "./polling.js";
 import { PLUGIN_ID, CHANNEL_ID, BRIDGE_URL } from "./constants.js";
@@ -51,8 +52,8 @@ interface WeChatMiniprogramProbe {
 // ==================== Meta 配置 ====================
 
 const meta: ChannelMeta = {
-  label: "WeChat MiniProgram",
-  selectionLabel: "WeChat MiniProgram",
+  label: "OpenClawWeChat",
+  selectionLabel: "OpenClawWeChat",
   blurb: "Bridge for OpenClaw to WeChat MiniProgram via HTTP polling",
 };
 
@@ -190,7 +191,8 @@ export const inbound: ChannelInbound<WeChatMiniprogramAccount> = {
     };
     
     // 2. 构建 Session Key
-    const pluginConfig = getPluginConfig(deps.config);
+    // 确保 deps 和 deps.config 存在，如果不存在则使用 undefined（getPluginConfig 会处理）
+    const pluginConfig = getPluginConfig(deps?.config);
     const sessionKey = `${pluginConfig.sessionKeyPrefix}${userMessage.openid}`;
     
     // 3. 调用 OpenClaw Gateway API
@@ -231,7 +233,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
    * 解析目标地址
    * 
    * 处理 channel:openid 格式的 target，提取出 openid
-   * 例如: "wechat-miniprogram:onslD1wi_zoYBJggvREAPv-Dtl8E" -> "onslD1wi_zoYBJggvREAPv-Dtl8E"
+   * 例如: "openclawwechat:onslD1wi_zoYBJggvREAPv-Dtl8E" -> "onslD1wi_zoYBJggvREAPv-Dtl8E"
    */
   resolveTarget: ({ to, allowFrom, mode }) => {
     const trimmed = to?.trim() ?? "";
@@ -319,9 +321,10 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
    * 发送媒体消息
    */
   sendMedia: async (ctx) => {
-    const { to, text, mediaUrl, accountId, deps, replyToId } = ctx;
+    const { to, text, mediaUrl, accountId, cfg, replyToId } = ctx;
     // 使用统一的配置读取函数
-    const pluginConfig = getPluginConfig(deps.config);
+    // 使用 ctx.cfg 而不是 ctx.deps.config（与 sendText 保持一致）
+    const pluginConfig = getPluginConfig(cfg);
     const apiKey = pluginConfig.apiKey;
     
     if (!apiKey) {
@@ -332,36 +335,117 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
       throw new Error("Media URL is required");
     }
     
-    // 使用 OpenClaw SDK 加载媒体并识别类型
+    // 检查是否是本地路径（不是http://或https://开头）
+    const isLocalPath = !mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://');
+    
+    // 构建API URL（确保API Key中的冒号被URL编码）
+    const encodedAPIKey = apiKey.replace(/:/g, '%3A');
+    const sendPhotoURL = `${BRIDGE_URL}/bot${encodedAPIKey}/sendPhoto`;
+    
     try {
       const runtime = getWechatMiniprogramRuntime();
+      let response: Response;
       
-      // 加载媒体文件（支持本地路径或 HTTP URL）
-      const media = await runtime.media.loadWebMedia(mediaUrl);
-      
-      // 识别媒体类型
-      const kind = runtime.media.mediaKindFromMime(media.contentType);
-      
-      ctx.log?.info?.(`[${accountId || 'unknown'}] Sending media: url=${mediaUrl}, kind=${kind}, contentType=${media.contentType || 'unknown'}`);
-      
-      // 目前只支持图片类型
-      if (kind !== "image") {
-        throw new Error(`Unsupported media type: ${kind}. Only images are currently supported.`);
+      if (isLocalPath) {
+        // 本地路径：使用multipart/form-data上传
+        // 解析相对路径为绝对路径（相对于workspace目录）
+        const resolvedMediaPath = resolveMediaPath(mediaUrl);
+        
+        // 使用loadWebMedia加载本地文件
+        const media = await runtime.media.loadWebMedia(resolvedMediaPath);
+        
+        // 识别媒体类型
+        const kind = runtime.media.mediaKindFromMime(media.contentType);
+        
+        ctx.log?.info?.(`[${accountId || 'unknown'}] Sending media (local): path=${resolvedMediaPath}, kind=${kind}, contentType=${media.contentType || 'unknown'}`);
+        
+        // 目前只支持图片类型
+        if (kind !== "image") {
+          throw new Error(`Unsupported media type: ${kind}. Only images are currently supported.`);
+        }
+        
+        // 手动构建multipart/form-data请求体
+        const boundary = `----formdata-openclaw-${Date.now()}`;
+        const parts: Uint8Array[] = [];
+        const encoder = new TextEncoder();
+        
+        // 添加photo字段
+        const contentType = media.contentType || 'image/jpeg';
+        const fileName = mediaUrl.split('/').pop() || 'image.jpg';
+        parts.push(encoder.encode(`--${boundary}\r\n`));
+        parts.push(encoder.encode(`Content-Disposition: form-data; name="photo"; filename="${fileName}"\r\n`));
+        parts.push(encoder.encode(`Content-Type: ${contentType}\r\n\r\n`));
+        parts.push(media.buffer);
+        parts.push(encoder.encode(`\r\n`));
+        
+        // 添加chat_id字段
+        parts.push(encoder.encode(`--${boundary}\r\n`));
+        parts.push(encoder.encode(`Content-Disposition: form-data; name="chat_id"\r\n\r\n`));
+        parts.push(encoder.encode(to));
+        parts.push(encoder.encode(`\r\n`));
+        
+        // 添加caption字段（如果有）
+        if (text) {
+          parts.push(encoder.encode(`--${boundary}\r\n`));
+          parts.push(encoder.encode(`Content-Disposition: form-data; name="caption"\r\n\r\n`));
+          parts.push(encoder.encode(text));
+          parts.push(encoder.encode(`\r\n`));
+        }
+        
+        // 添加reply_to_message_id字段（如果有）
+        if (replyToId) {
+          parts.push(encoder.encode(`--${boundary}\r\n`));
+          parts.push(encoder.encode(`Content-Disposition: form-data; name="reply_to_message_id"\r\n\r\n`));
+          parts.push(encoder.encode(String(parseInt(String(replyToId)))));
+          parts.push(encoder.encode(`\r\n`));
+        }
+        
+        // 结束boundary
+        parts.push(encoder.encode(`--${boundary}--\r\n`));
+        
+        // 合并所有部分
+        const totalLength = parts.reduce((acc, part) => acc + part.length, 0);
+        const body = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const part of parts) {
+          body.set(part, offset);
+          offset += part.length;
+        }
+        
+        response = await fetch(sendPhotoURL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          },
+          body: body,
+        });
+      } else {
+        // URL：使用JSON格式，后端会下载
+        // 加载媒体文件以识别类型
+        const media = await runtime.media.loadWebMedia(mediaUrl);
+        const kind = runtime.media.mediaKindFromMime(media.contentType);
+        
+        ctx.log?.info?.(`[${accountId || 'unknown'}] Sending media (URL): url=${mediaUrl}, kind=${kind}, contentType=${media.contentType || 'unknown'}`);
+        
+        // 目前只支持图片类型
+        if (kind !== "image") {
+          throw new Error(`Unsupported media type: ${kind}. Only images are currently supported.`);
+        }
+        
+        // 调用中转服务器 API（sendPhoto，Telegram Bot API 兼容格式）
+        response = await fetch(sendPhotoURL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: to,
+            photo: mediaUrl, // 使用原始 URL，后端会处理下载和上传
+            caption: text,
+            reply_to_message_id: replyToId ? parseInt(String(replyToId)) : undefined,
+          }),
+        });
       }
-      
-      // 调用中转服务器 API（sendPhoto，Telegram Bot API 兼容格式）
-      const response = await fetch(`${BRIDGE_URL}/bot${apiKey}/sendPhoto`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: to,
-          photo: mediaUrl, // 使用原始 URL，后端会处理下载和上传
-          caption: text,
-          reply_to_message_id: replyToId ? parseInt(replyToId) : undefined,
-        }),
-      });
       
       if (!response.ok) {
         const errorText = await response.text();

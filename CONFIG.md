@@ -8,13 +8,13 @@ OpenClaw 配置文件位于：`~/.openclaw/openclaw.json`
 
 ### 必需配置
 
-在 `plugins.entries.wechat-miniprogram.config` 中添加以下配置：
+在 `plugins.entries.openclawwechat.config` 中添加以下配置：
 
 ```json
 {
   "plugins": {
     "entries": {
-      "wechat-miniprogram": {
+      "openclawwechat": {
         "enabled": true,
         "config": {
           "apiKey": "20231227:9HkPUB2HzCyQVtKs6Z0M3ICe9NiM84fedLV",
@@ -52,7 +52,7 @@ API Key 格式：`<bot_id>:<secret>`
 
 ## 📝 完整配置示例
 
-基于你的原始配置，添加 `wechat-miniprogram` 配置后的完整配置：
+基于你的原始配置，添加 `openclawwechat` 配置后的完整配置：
 
 ```json
 {
@@ -133,7 +133,7 @@ API Key 格式：`<bot_id>:<secret>`
       "telegram": {
         "enabled": true
       },
-      "wechat-miniprogram": {
+      "openclawwechat": {
         "enabled": true,
         "config": {
           "apiKey": "20231227:9HkPUB2HzCyQVtKs6Z0M3ICe9NiM84fedLV",
@@ -173,13 +173,13 @@ API_KEY = "20231227:9HkPUB2HzCyQVtKs6Z0M3ICe9NiM84fedLV"
 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
   config = json.load(f)
 
-# 添加 wechat-miniprogram 配置
+# 添加 openclawwechat 配置
 if 'plugins' not in config:
   config['plugins'] = {}
 if 'entries' not in config['plugins']:
   config['plugins']['entries'] = {}
 
-config['plugins']['entries']['wechat-miniprogram'] = {
+config['plugins']['entries']['openclawwechat'] = {
   'enabled': True,
   'config': {
     'apiKey': API_KEY,
@@ -208,7 +208,7 @@ openclaw gateway restart
 查看日志确认插件已加载：
 
 ```bash
-openclaw logs --follow | grep "wechat-miniprogram"
+openclaw logs --follow | grep "openclawwechat"
 ```
 
 ## 📚 相关文档
