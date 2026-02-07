@@ -275,12 +275,98 @@ create_and_push_git_tag() {
     fi
 }
 
+# 仅推送到 GitHub（不更新版本，不发布 npm）
+push_to_github_only() {
+    if [ ! -d .git ]; then
+        print_error "当前目录不是 git 仓库"
+        exit 1
+    fi
+    
+    if ! check_git_remote; then
+        print_error "未配置 git remote origin"
+        exit 1
+    fi
+    
+    echo ""
+    echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║   推送到 GitHub                      ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    # 检查是否有未提交的更改
+    if ! git diff --quiet HEAD -- 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        print_warning "检测到有未提交的更改"
+        read -p "是否先提交所有更改？(y/N): " commit_choice
+        if [[ "$commit_choice" =~ ^[Yy]$ ]]; then
+            read -p "请输入 commit 消息（留空使用默认）: " commit_msg
+            if [ -z "$commit_msg" ]; then
+                commit_msg="chore: update files"
+            fi
+            
+            git add -A
+            git commit -m "$commit_msg" || {
+                print_error "提交失败"
+                exit 1
+            }
+            print_success "已提交更改"
+        else
+            print_info "跳过提交，直接推送已有提交"
+        fi
+        echo ""
+    fi
+    
+    # 检查是否有未推送的提交
+    local ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo "0")
+    if [ "$ahead" = "0" ]; then
+        print_info "没有需要推送的提交"
+    else
+        print_info "有 $ahead 个提交需要推送"
+    fi
+    
+    # 推送代码
+    print_info "推送到 GitHub..."
+    if git push origin HEAD 2>/dev/null; then
+        print_success "代码已推送到 GitHub"
+    else
+        print_error "代码推送失败"
+        exit 1
+    fi
+    
+    # 检查是否有未推送的 tag
+    local current_version=$(node -p "require('./package.json').version")
+    local tag="v$current_version"
+    
+    if git rev-parse "$tag" &> /dev/null; then
+        local tag_exists_remote=$(git ls-remote --tags origin "$tag" 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$tag_exists_remote" = "0" ]; then
+            print_info "推送 tag: $tag"
+            if git push origin "$tag" 2>/dev/null; then
+                print_success "Tag $tag 已推送到 GitHub"
+            else
+                print_warning "Tag 推送失败，请手动运行: git push origin $tag"
+            fi
+        else
+            print_info "Tag $tag 已存在于远程仓库"
+        fi
+    fi
+    
+    echo ""
+    print_success "推送完成！"
+    echo ""
+}
+
 # 主函数
 main() {
     local version_type=""
     local tag="latest"
     local commit_all=false
     local commit_message=""
+    
+    # 检查是否是 github 命令
+    if [ "$1" = "github" ]; then
+        push_to_github_only
+        return 0
+    fi
     
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -431,7 +517,10 @@ show_help() {
 NPM 发布脚本
 
 用法:
-  ./publish.sh [版本类型] [选项]
+  ./publish.sh [命令/版本类型] [选项]
+
+命令:
+  github                 仅推送到 GitHub（不更新版本，不发布 npm）
 
 版本类型:
   patch   更新补丁版本 (1.0.0 -> 1.0.1)
@@ -446,6 +535,7 @@ NPM 发布脚本
   -h, --help                显示帮助信息
 
 示例:
+  ./publish.sh github                  # 仅推送到 GitHub
   ./publish.sh patch                    # 发布补丁版本
   ./publish.sh minor                    # 发布次要版本
   ./publish.sh beta                     # 发布 beta 版本
