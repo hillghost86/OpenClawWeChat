@@ -1,12 +1,48 @@
 {
-  "name": "@openclaw/openclawwechat",
-  "version": "1.0.0",
+  "name": "openclawwechat",
+  "version": "1.0.1",
   "description": "OpenClawWeChat - OpenClaw WeChat MiniProgram channel plugin",
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "wechat",
+    "miniprogram",
+    "channel",
+    "telegram-bot-api"
+  ],
+  "license": "MIT",
+  "author": "OpenClaw Plugin Development",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hillghost86/OpenClawWeChat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hillghost86/OpenClawWeChat/issues"
+  },
+  "homepage": "https://github.com/hillghost86/OpenClawWeChat#readme",
   "type": "module",
   "main": "index.ts",
+  "files": [
+    "index.ts",
+    "src/**/*.ts",
+    "scripts/**/*.js",
+    "openclaw.plugin.json",
+    "README.md",
+    "CONFIG.md",
+    "EXAMPLE.md",
+    "INSTALL.md"
+  ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "pack": "npm pack --dry-run",
+    "publish:public": "npm publish --access public",
+    "publish:beta": "npm publish --access public --tag beta",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "config-init": "node scripts/config-init.js"
   },
   "devDependencies": {
     "openclaw": "workspace:*",

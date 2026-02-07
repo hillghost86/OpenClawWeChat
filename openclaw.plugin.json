@@ -2,7 +2,7 @@
   "id": "openclawwechat",
   "name": "OpenClawWeChat",
   "description": "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "index.ts",
   "author": "OpenClaw Plugin Development",
@@ -13,6 +13,7 @@
     "properties": {
       "apiKey": {
         "type": "string",
+        "default": "YOUR_API_KEY_HERE",
         "description": "API Key（格式：bot_id:secret）"
       },
       "pollIntervalMs": {
@@ -31,7 +32,9 @@
         "description": "是否启用调试日志"
       }
     },
-    "required": ["apiKey"]
+    "required": [
+      "apiKey"
+    ]
   },
   "openclaw": {
     "channel": {
@@ -42,10 +45,14 @@
       "docsPath": "/channels/openclawwechat",
       "docsLabel": "openclawwechat",
       "systemImage": "bubble.left.and.text.bubble.right",
-      "aliases": ["wechat", "miniprogram", "wx"]
+      "aliases": [
+        "wechat",
+        "miniprogram",
+        "wx"
+      ]
     },
     "install": {
-      "npmSpec": "@openclaw/openclawwechat",
+      "npmSpec": "openclawwechat",
       "localPath": "extensions/OpenClawWeChat",
       "defaultChoice": "local"
     }
