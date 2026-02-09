@@ -117,6 +117,8 @@ export async function injectMessage(
     Timestamp: Date.now(),
     OriginatingChannel: CHANNEL_ID as const,
     OriginatingTo: `${CHANNEL_ID}:${message.openid}`,
+    CommandSource: "text" as const, // 明确指定这是文本命令，确保 allowTextCommands 返回 true
+    CommandAuthorized: true, // 授权命令执行，确保 isAuthorizedSender 为 true
     // 添加媒体信息（如果有）
     // 优先使用本地路径（MediaPaths），如果没有则使用URL（MediaUrls）
     MediaPaths: message.mediaPaths.length > 0 ? message.mediaPaths : undefined,

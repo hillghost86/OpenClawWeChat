@@ -2,7 +2,7 @@
 
 OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpneClaw 与个人微信之间进行通讯会话。
 
-众所周知的原因，中中国大陆无法使用Teletegram，Whatapp等工具与Opencalw会话，虽然可以使用飞书、钉钉但配置起来也比较负责。而国名第一大app微信，却只支持企业微信，不支持个人微信。
+众所周知的原因，中中国大陆无法使用Teletegram，Whatapp等工具与Opencalw会话，虽然可以使用飞书、钉钉但配置起来也比较复杂。而国名第一大app微信，却只支持企业微信，不支持个人微信。
 
 OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程序进行链接，可以直接通过微信小程序与OpenClaw进行对话，让OpenClaw做你让他做的事情。并且可以随时随地获得OpenClaw的回复。
 
@@ -18,7 +18,7 @@ OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程
 ## 📋 前置要求
 
 - OpenClaw Gateway 已安装并运行
-  - 安装见openclaw官网 https://openclaw.ai
+  - 安装见 [openclaw官网 https://openclaw.ai](https://openclaw.ai)[gtihub openclaw](https://github.com/openclaw)
 - 有效的 API Key（格式：`bot_id:secret`）
   - 💡 **获取方式：** 打开微信，搜索小程序 **ClawChat**，在我的页面 APIKey管理 复制你的 API Key
 
@@ -307,7 +307,7 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
 ```
 
 
-## 🔍 故障排查
+## 七、故障排查
 
 ### 常见问题
 
