@@ -130,6 +130,27 @@ function removePluginConfig(config) {
   return config;
 }
 
+// 删除插件安装记录
+function removePluginInstallRecord(config) {
+  if (!config?.plugins?.installs?.[PLUGIN_ID]) {
+    return config;
+  }
+
+  delete config.plugins.installs[PLUGIN_ID];
+
+  // 如果 installs 为空，清理结构
+  if (Object.keys(config.plugins.installs).length === 0) {
+    delete config.plugins.installs;
+  }
+
+  return config;
+}
+
+// 检查插件安装记录是否存在
+function hasPluginInstallRecord(config) {
+  return Boolean(config?.plugins?.installs?.[PLUGIN_ID]);
+}
+
 // 删除插件目录
 function removePluginDirectory() {
   if (!fs.existsSync(PLUGIN_DIR)) {
@@ -169,6 +190,7 @@ async function main() {
   // 读取配置（如果配置文件存在）
   let config = null;
   let hasConfig = false;
+  let hasInstallRecord = false;
 
   if (configExists) {
     config = readConfig();
@@ -177,17 +199,18 @@ async function main() {
       process.exit(1);
     }
     hasConfig = hasPluginConfig(config);
+    hasInstallRecord = hasPluginInstallRecord(config);
   }
 
-  // 如果既没有配置也没有目录，直接返回
-  if (!hasConfig && !pluginDirExists) {
-    printInfo('未找到插件配置和目录，无需卸载');
+  // 如果既没有配置也没有安装记录也没有目录，直接返回
+  if (!hasConfig && !hasInstallRecord && !pluginDirExists) {
+    printInfo('未找到插件配置、安装记录和目录，无需卸载');
     return;
   }
 
   // 如果只有目录没有配置，仍然可以删除目录
-  if (!hasConfig && pluginDirExists) {
-    printWarning('配置文件中未找到插件配置，但检测到插件目录');
+  if (!hasConfig && !hasInstallRecord && pluginDirExists) {
+    printWarning('配置文件中未找到插件配置和安装记录，但检测到插件目录');
     console.log('');
   }
 
@@ -207,6 +230,23 @@ async function main() {
     console.log('');
   }
 
+  // 显示安装记录（如果存在）
+  if (hasInstallRecord) {
+    const installRecord = config.plugins.installs[PLUGIN_ID];
+    printInfo('检测到插件安装记录:');
+    console.log(`  来源: ${installRecord.source || 'unknown'}`);
+    if (installRecord.spec) {
+      console.log(`  npm spec: ${installRecord.spec}`);
+    }
+    if (installRecord.version) {
+      console.log(`  版本: ${installRecord.version}`);
+    }
+    if (installRecord.installPath) {
+      console.log(`  安装路径: ${installRecord.installPath}`);
+    }
+    console.log('');
+  }
+
   // 显示插件目录信息
   if (pluginDirExists) {
     printInfo(`检测到插件目录: ${PLUGIN_DIR}`);
@@ -216,6 +256,7 @@ async function main() {
   const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
 
   let shouldRemoveConfig = false;
+  let shouldRemoveInstallRecord = false;
   let shouldRemoveDir = false;
 
   if (isInteractive) {
@@ -223,11 +264,22 @@ async function main() {
     const rl = createRL();
 
     // 询问是否删除配置
-    const configAnswer = await question(
-      rl,
-      colorize('是否删除插件配置？(y/N): ', 'yellow')
-    );
-    shouldRemoveConfig = configAnswer.toLowerCase() === 'y' || configAnswer.toLowerCase() === 'yes';
+    if (hasConfig) {
+      const configAnswer = await question(
+        rl,
+        colorize('是否删除插件配置？(y/N): ', 'yellow')
+      );
+      shouldRemoveConfig = configAnswer.toLowerCase() === 'y' || configAnswer.toLowerCase() === 'yes';
+    }
+
+    // 询问是否删除安装记录
+    if (hasInstallRecord) {
+      const installRecordAnswer = await question(
+        rl,
+        colorize('是否删除插件安装记录？(y/N): ', 'yellow')
+      );
+      shouldRemoveInstallRecord = installRecordAnswer.toLowerCase() === 'y' || installRecordAnswer.toLowerCase() === 'yes';
+    }
 
     // 如果插件目录存在，询问是否删除目录
     if (pluginDirExists) {
@@ -240,7 +292,7 @@ async function main() {
 
     rl.close();
 
-    if (!shouldRemoveConfig && !shouldRemoveDir) {
+    if (!shouldRemoveConfig && !shouldRemoveInstallRecord && !shouldRemoveDir) {
       printInfo('已取消，未执行任何操作');
       return;
     }
@@ -252,17 +304,19 @@ async function main() {
       printInfo('用法: npm run uninstall -- --yes');
       process.exit(1);
     }
-    shouldRemoveConfig = true;
+    shouldRemoveConfig = hasConfig;
+    shouldRemoveInstallRecord = hasInstallRecord;
     shouldRemoveDir = pluginDirExists;
   }
 
   let configRemoved = false;
+  let installRecordRemoved = false;
   let dirRemoved = false;
 
   // 删除配置（如果配置存在）
   if (shouldRemoveConfig && hasConfig) {
-    const updatedConfig = removePluginConfig(config);
-    if (writeConfig(updatedConfig)) {
+    config = removePluginConfig(config);
+    if (writeConfig(config)) {
       printSuccess('插件配置已从配置文件中删除');
       configRemoved = true;
     } else {
@@ -270,6 +324,19 @@ async function main() {
     }
   } else if (shouldRemoveConfig && !hasConfig) {
     printWarning('配置不存在，跳过删除配置');
+  }
+
+  // 删除安装记录（如果记录存在）
+  if (shouldRemoveInstallRecord && hasInstallRecord) {
+    config = removePluginInstallRecord(config);
+    if (writeConfig(config)) {
+      printSuccess('插件安装记录已从配置文件中删除');
+      installRecordRemoved = true;
+    } else {
+      printError('删除安装记录失败');
+    }
+  } else if (shouldRemoveInstallRecord && !hasInstallRecord) {
+    printWarning('安装记录不存在，跳过删除安装记录');
   }
 
   // 删除插件目录
@@ -285,24 +352,43 @@ async function main() {
 
   // 总结
   console.log('');
-  if (configRemoved || dirRemoved) {
+  if (configRemoved || installRecordRemoved || dirRemoved) {
     printSuccess('卸载完成！');
     console.log('');
-    if (configRemoved && dirRemoved) {
+    const removedItems = [];
+    if (configRemoved) removedItems.push('插件配置');
+    if (installRecordRemoved) removedItems.push('插件安装记录');
+    if (dirRemoved) removedItems.push('插件目录');
+    
+    if (removedItems.length > 0) {
       printInfo('已删除：');
-      console.log('  ✅ 插件配置');
-      console.log('  ✅ 插件目录');
-    } else if (configRemoved) {
-      printInfo('已删除：');
-      console.log('  ✅ 插件配置');
-      if (pluginDirExists) {
+      removedItems.forEach(item => console.log(`  ✅ ${item}`));
+    }
+    
+    // 提示未删除的项目
+    const notRemovedItems = [];
+    if (shouldRemoveConfig && !configRemoved && hasConfig) {
+      notRemovedItems.push('插件配置');
+    }
+    if (shouldRemoveInstallRecord && !installRecordRemoved && hasInstallRecord) {
+      notRemovedItems.push('插件安装记录');
+    }
+    if (shouldRemoveDir && !dirRemoved && pluginDirExists) {
+      notRemovedItems.push('插件目录');
+    }
+    
+    if (notRemovedItems.length > 0) {
+      printWarning('以下项目未删除，需要手动处理:');
+      if (shouldRemoveConfig && !configRemoved && hasConfig) {
+        printWarning('插件配置未删除，需要手动编辑配置文件');
+      }
+      if (shouldRemoveInstallRecord && !installRecordRemoved && hasInstallRecord) {
+        printWarning('插件安装记录未删除，需要手动编辑配置文件');
+      }
+      if (shouldRemoveDir && !dirRemoved && pluginDirExists) {
         printWarning('插件目录未删除，需要手动删除:');
         console.log(`   ${colorize(`rm -rf "${PLUGIN_DIR}"`, 'green')}`);
       }
-    } else if (dirRemoved) {
-      printInfo('已删除：');
-      console.log('  ✅ 插件目录');
-      printWarning('插件配置未删除，需要手动编辑配置文件');
     }
 
     console.log('');

@@ -18,6 +18,9 @@ const PLUGIN_ID = 'openclawwechat';
 const CONFIG_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.openclaw', 'openclaw.json');
 const PLACEHOLDER_API_KEY = 'YOUR_API_KEY_HERE';
 const MANIFEST_FILE = path.join(__dirname, '..', 'openclaw.plugin.json');
+const PACKAGE_FILE = path.join(__dirname, '..', 'package.json');
+const EXTENSIONS_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.openclaw', 'extensions');
+const PLUGIN_DIR = path.join(EXTENSIONS_DIR, PLUGIN_ID);
 
 // 从插件清单读取默认值（延迟加载，避免在 printWarning 定义前调用）
 function loadDefaultsFromManifest() {
@@ -185,6 +188,27 @@ function getPluginConfig(config) {
   return config.plugins.entries[PLUGIN_ID].config || null;
 }
 
+// 读取 package.json 获取版本信息
+function readPackageInfo() {
+  try {
+    if (!fs.existsSync(PACKAGE_FILE)) {
+      return null;
+    }
+    const content = fs.readFileSync(PACKAGE_FILE, 'utf-8');
+    const pkg = JSON.parse(content);
+    return {
+      name: pkg.name || PLUGIN_ID,
+      version: pkg.version || '1.0.0'
+    };
+  } catch (err) {
+    printWarning(`读取 package.json 失败: ${err.message}，使用默认值`);
+    return {
+      name: PLUGIN_ID,
+      version: '1.0.0'
+    };
+  }
+}
+
 // 设置插件配置
 function setPluginConfig(config, pluginConfig) {
   if (!config.plugins) {
@@ -199,6 +223,40 @@ function setPluginConfig(config, pluginConfig) {
   
   config.plugins.entries[PLUGIN_ID].enabled = true;
   config.plugins.entries[PLUGIN_ID].config = pluginConfig;
+  
+  return config;
+}
+
+// 设置插件安装记录
+function setPluginInstallRecord(config) {
+  if (!config.plugins) {
+    config.plugins = {};
+  }
+  if (!config.plugins.installs) {
+    config.plugins.installs = {};
+  }
+  
+  // 读取 package.json 获取版本信息
+  const pkgInfo = readPackageInfo();
+  const npmSpec = pkgInfo?.name || PLUGIN_ID;
+  const version = pkgInfo?.version || '1.0.0';
+  
+  // 检查插件目录是否存在
+  const installPath = PLUGIN_DIR;
+  const installPathExists = fs.existsSync(installPath);
+  
+  // 如果插件目录存在，使用实际路径；否则使用相对路径
+  const resolvedInstallPath = installPathExists 
+    ? installPath 
+    : `~/.openclaw/extensions/${PLUGIN_ID}`;
+  
+  config.plugins.installs[PLUGIN_ID] = {
+    source: 'npm',
+    spec: npmSpec,
+    installPath: resolvedInstallPath,
+    version: version,
+    installedAt: new Date().toISOString()
+  };
   
   return config;
 }
@@ -408,7 +466,10 @@ async function main() {
     }
     
     // 保存配置（最小化配置）
-    const updatedConfig = setPluginConfig(config, minimalConfig);
+    let updatedConfig = setPluginConfig(config, minimalConfig);
+    
+    // 添加插件安装记录
+    updatedConfig = setPluginInstallRecord(updatedConfig);
     
     if (writeConfig(updatedConfig)) {
       printSuccess('配置已保存！');
