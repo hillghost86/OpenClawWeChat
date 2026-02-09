@@ -18,7 +18,7 @@ OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程
 ## 📋 前置要求
 
 - OpenClaw Gateway 已安装并运行
-  - 安装见 [openclaw官网 https://openclaw.ai](https://openclaw.ai)[gtihub openclaw](https://github.com/openclaw)
+  - 安装见 [openclaw官网 https://openclaw.ai](https://openclaw.ai)[gtihub@openclaw](https://github.com/openclaw)
 - 有效的 API Key（格式：`bot_id:secret`）
   - 💡 **获取方式：** 打开微信，搜索小程序 **ClawChat**，在我的页面 APIKey管理 复制你的 API Key
 
@@ -108,8 +108,9 @@ node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\config-init.js
 - ✅ 询问是否需要自定义其他配置项
 - ✅ 只保存自定义的配置（使用默认值的配置不会写入文件）
 - ✅ 自动验证配置格式
+- ✅ 自动创建插件安装记录（方便后续使用 `openclaw plugins update` 升级）
 
-### 方法二：手动编辑配置文件
+### 方法二：手动编辑配置文件 (不建议）
 
 **配置文件位置：**
 
@@ -195,7 +196,71 @@ openclaw logs --follow | grep "openclawwechat"
   "debug": false
 }
 ```
-## 五、卸载插件
+## 五、升级插件
+
+### 方法一：使用 OpenClaw 命令升级（推荐）
+
+如果插件是通过 `openclaw plugins install` 安装的，并且配置脚本已创建了安装记录，可以使用以下命令升级：
+
+```bash
+# 升级到最新版本
+openclaw plugins update openclawwechat
+
+# 查看升级结果
+openclaw plugins list | grep openclawwechat
+```
+
+> 💡 **提示：** 
+> - 如果提示 "No install record"，说明配置文件中没有安装记录，请使用方法二
+> - 如果运行 `config-init.js` 配置脚本，会自动创建安装记录，之后就可以使用此方法升级
+
+
+### 方法二：删除后重新安装
+插件版本1.0.9以前的版本，使用方法二，删除后重新安装。
+如果配置文件中没有安装记录，可以删除旧版本后重新安装：
+
+```bash
+# 1. 删除旧版本
+rm -rf ~/.openclaw/extensions/openclawwechat
+
+# 2. 重新安装最新版本
+openclaw plugins install openclawwechat
+
+# 3. 运行配置脚本（如果配置已存在，可以选择不更新）
+cd ~/.openclaw/extensions/openclawwechat
+npm run config-init
+```
+
+### 方法三：从 GitHub 手动升级 （不推荐）
+
+如果是从 GitHub 克隆安装的：
+
+```bash
+# 进入插件目录
+cd ~/.openclaw/extensions/openclawwechat
+
+# 拉取最新代码
+git pull
+
+# 更新配置文件
+npm run config-init
+
+# 重启 Gateway
+openclaw gateway restart
+```
+
+### 升级后验证
+
+升级完成后，建议验证插件是否正常工作：
+
+```bash
+# 1. 查看插件版本
+openclaw plugins list | grep openclawwechat
+
+# 3. 在微信小程序 ClawChat 中测试消息发送
+```
+
+## 六、卸载插件
 
 **Mac/Linux**
 
@@ -233,7 +298,8 @@ node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\unistall.js
 
 卸载脚本会：
 1. 从配置文件中删除插件配置
-2. 删除插件目录（`~/.openclaw/extensions/openclawwechat`）
+2. 从配置文件中删除插件安装记录（如果存在）
+3. 删除插件目录（`~/.openclaw/extensions/openclawwechat`）
 
 **手动卸载：**
 
@@ -251,7 +317,7 @@ openclaw gateway restart
 ```
 
 
-## 六、核心实现
+## 七、核心实现
 
 #### 1. 插件入口 (index.ts)
 
@@ -307,7 +373,7 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
 ```
 
 
-## 七、故障排查
+## 八、故障排查
 
 ### 常见问题
 
