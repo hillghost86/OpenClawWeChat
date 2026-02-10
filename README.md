@@ -9,7 +9,11 @@ OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程
 ## ✨ 功能特性
 
 - ✅ **文本消息**：支持发送和接收文本消息
-- ✅ **媒体消息**：支持图片等媒体文件，支持发送pdf，word等文档文件的发送
+- ✅ **媒体消息**：支持多种媒体文件类型
+  - 📷 **图片**：支持 JPG、PNG、GIF、WebP 等格式
+  - 🎬 **视频**：支持 MP4、MOV 等视频格式
+  - 🎵 **音频**：支持 MP3、WAV、OGG 等音频格式（语音消息）
+  - 📄 **文档**：支持 PDF、Word、Excel、压缩包等文档格式
 - ✅ **消息回复**：支持消息回复功能
 - ✅ **Telegram Bot API 兼容**：使用 Telegram Bot API 兼容格式
 - ✅ **错误处理**：完整的错误处理和日志记录
@@ -406,6 +410,7 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
 
 ## 📖 相关文档
 
+- [更新日志](./CHANGELOG.md)
 - [详细配置说明](./CONFIG.md)
 - [OpenClaw 插件开发指南](https://docs.openclaw.ai/plugins)
 

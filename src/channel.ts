@@ -340,41 +340,79 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
     
     // 构建API URL（确保API Key中的冒号被URL编码）
     const encodedAPIKey = apiKey.replace(/:/g, '%3A');
-    const sendPhotoURL = `${BRIDGE_URL}/bot${encodedAPIKey}/sendPhoto`;
     
     try {
       const runtime = getWechatMiniprogramRuntime();
       let response: Response;
       
+      // 先加载媒体文件以识别类型（本地路径和URL都需要）
+      let media;
+      let kind: string;
+      let contentType: string;
+      
+      if (isLocalPath) {
+        // 本地路径：解析相对路径为绝对路径（相对于workspace目录）
+        const resolvedMediaPath = resolveMediaPath(mediaUrl);
+        media = await runtime.media.loadWebMedia(resolvedMediaPath);
+        kind = runtime.media.mediaKindFromMime(media.contentType);
+        contentType = media.contentType || '';
+        ctx.log?.info?.(`[${accountId || 'unknown'}] Sending media (local): path=${resolvedMediaPath}, kind=${kind}, contentType=${contentType || 'unknown'}`);
+      } else {
+        // URL：加载媒体文件以识别类型
+        media = await runtime.media.loadWebMedia(mediaUrl);
+        kind = runtime.media.mediaKindFromMime(media.contentType);
+        contentType = media.contentType || '';
+        ctx.log?.info?.(`[${accountId || 'unknown'}] Sending media (URL): url=${mediaUrl}, kind=${kind}, contentType=${contentType || 'unknown'}`);
+      }
+      
+      // 根据媒体类型确定 API 端点、字段名和默认文件名
+      let sendMediaURL: string;
+      let fieldName: string;
+      let defaultFileName: string;
+      let jsonFieldName: string;
+      
+      if (kind === "image") {
+        sendMediaURL = `${BRIDGE_URL}/bot${encodedAPIKey}/sendPhoto`;
+        fieldName = "photo";
+        jsonFieldName = "photo";
+        defaultFileName = "image.jpg";
+      } else if (kind === "video") {
+        sendMediaURL = `${BRIDGE_URL}/bot${encodedAPIKey}/sendVideo`;
+        fieldName = "video";
+        jsonFieldName = "video";
+        defaultFileName = "video.mp4";
+      } else if (kind === "audio") {
+        // 音频文件使用 sendDocument API（后端会将 audio 路由到 SendDocument）
+        sendMediaURL = `${BRIDGE_URL}/bot${encodedAPIKey}/sendDocument`;
+        fieldName = "document";
+        jsonFieldName = "document";
+        defaultFileName = "audio.mp3";
+      } else {
+        // 其他类型（document）使用 sendDocument API
+        sendMediaURL = `${BRIDGE_URL}/bot${encodedAPIKey}/sendDocument`;
+        fieldName = "document";
+        jsonFieldName = "document";
+        defaultFileName = "document";
+      }
+      
       if (isLocalPath) {
         // 本地路径：使用multipart/form-data上传
-        // 解析相对路径为绝对路径（相对于workspace目录）
-        const resolvedMediaPath = resolveMediaPath(mediaUrl);
-        
-        // 使用loadWebMedia加载本地文件
-        const media = await runtime.media.loadWebMedia(resolvedMediaPath);
-        
-        // 识别媒体类型
-        const kind = runtime.media.mediaKindFromMime(media.contentType);
-        
-        ctx.log?.info?.(`[${accountId || 'unknown'}] Sending media (local): path=${resolvedMediaPath}, kind=${kind}, contentType=${media.contentType || 'unknown'}`);
-        
-        // 目前只支持图片类型
-        if (kind !== "image") {
-          throw new Error(`Unsupported media type: ${kind}. Only images are currently supported.`);
-        }
+        const fileName = mediaUrl.split('/').pop() || defaultFileName;
         
         // 手动构建multipart/form-data请求体
         const boundary = `----formdata-openclaw-${Date.now()}`;
         const parts: Uint8Array[] = [];
         const encoder = new TextEncoder();
         
-        // 添加photo字段
-        const contentType = media.contentType || 'image/jpeg';
-        const fileName = mediaUrl.split('/').pop() || 'image.jpg';
+        // 添加媒体字段（photo、video 或 document）
+        const finalContentType = contentType || 
+          (kind === "video" ? 'video/mp4' : 
+           kind === "audio" ? 'audio/mpeg' : 
+           kind === "image" ? 'image/jpeg' : 
+           'application/octet-stream');
         parts.push(encoder.encode(`--${boundary}\r\n`));
-        parts.push(encoder.encode(`Content-Disposition: form-data; name="photo"; filename="${fileName}"\r\n`));
-        parts.push(encoder.encode(`Content-Type: ${contentType}\r\n\r\n`));
+        parts.push(encoder.encode(`Content-Disposition: form-data; name="${fieldName}"; filename="${fileName}"\r\n`));
+        parts.push(encoder.encode(`Content-Type: ${finalContentType}\r\n\r\n`));
         parts.push(media.buffer);
         parts.push(encoder.encode(`\r\n`));
         
@@ -412,7 +450,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
           offset += part.length;
         }
         
-        response = await fetch(sendPhotoURL, {
+        response = await fetch(sendMediaURL, {
           method: 'POST',
           headers: {
             'Content-Type': `multipart/form-data; boundary=${boundary}`,
@@ -421,35 +459,25 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
         });
       } else {
         // URL：使用JSON格式，后端会下载
-        // 加载媒体文件以识别类型
-        const media = await runtime.media.loadWebMedia(mediaUrl);
-        const kind = runtime.media.mediaKindFromMime(media.contentType);
+        const jsonBody: any = {
+          chat_id: to,
+          [jsonFieldName]: mediaUrl, // 使用原始 URL，后端会处理下载和上传
+          caption: text || undefined,
+          reply_to_message_id: replyToId ? parseInt(String(replyToId)) : undefined,
+        };
         
-        ctx.log?.info?.(`[${accountId || 'unknown'}] Sending media (URL): url=${mediaUrl}, kind=${kind}, contentType=${media.contentType || 'unknown'}`);
-        
-        // 目前只支持图片类型
-        if (kind !== "image") {
-          throw new Error(`Unsupported media type: ${kind}. Only images are currently supported.`);
-        }
-        
-        // 调用中转服务器 API（sendPhoto，Telegram Bot API 兼容格式）
-        response = await fetch(sendPhotoURL, {
+        response = await fetch(sendMediaURL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            chat_id: to,
-            photo: mediaUrl, // 使用原始 URL，后端会处理下载和上传
-            caption: text,
-            reply_to_message_id: replyToId ? parseInt(String(replyToId)) : undefined,
-          }),
+          body: JSON.stringify(jsonBody),
         });
       }
       
       if (!response.ok) {
         const errorText = await response.text();
-        ctx.log?.error?.(`[${accountId || 'unknown'}] Failed to send photo: ${response.status} ${response.statusText}, body=${errorText}`);
+        ctx.log?.error?.(`[${accountId || 'unknown'}] Failed to send ${kind}: ${response.status} ${response.statusText}, body=${errorText}`);
         throw new Error(`Failed to send media: ${response.statusText}`);
       }
       
@@ -459,7 +487,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
         throw new Error(`API error: ${data.description || 'Unknown error'}`);
       }
       
-      ctx.log?.info?.(`[${accountId || 'unknown'}] ✅ Successfully sent photo to ${to}, message_id=${data.result?.message_id}`);
+      ctx.log?.info?.(`[${accountId || 'unknown'}] ✅ Successfully sent ${kind} to ${to}, message_id=${data.result?.message_id}`);
       
       return {
         channel: CHANNEL_ID,
