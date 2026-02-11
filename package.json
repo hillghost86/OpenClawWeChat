@@ -31,7 +31,8 @@
     "CHANGELOG.md",
     "CONFIG.md",
     "EXAMPLE.md",
-    "INSTALL.md"
+    "INSTALL.md",
+    "images/**/*"
   ],
   "scripts": {
     "build": "tsc",

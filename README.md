@@ -9,6 +9,7 @@ OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程
 ## ✨ 功能特性
 
 - ✅ **文本消息**：支持发送和接收文本消息
+  - 支持发送斜杠指令
 - ✅ **媒体消息**：支持多种媒体文件类型
   - 📷 **图片**：支持 JPG、PNG、GIF、WebP 等格式
   - 🎬 **视频**：支持 MP4、MOV 等视频格式
@@ -18,6 +19,11 @@ OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程
 - ✅ **Telegram Bot API 兼容**：使用 Telegram Bot API 兼容格式
 - ✅ **错误处理**：完整的错误处理和日志记录
 - ✅ **状态管理**：支持账户状态查询和管理
+
+![ClawChat 截图 1](images/clawchat0.jpg)
+![ClawChat 截图 3](images/clawchat2.jpg)
+![ClawChat 截图 2](images/clawchat1.jpg)
+![ClawChat 截图 4](images/clawchat3.jpg)
 
 ## 📋 前置要求
 
