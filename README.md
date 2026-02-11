@@ -20,14 +20,14 @@ OpenClawWeChat 就是来解决这个用户痛点的。将OpenClaw与微信小程
 - ✅ **错误处理**：完整的错误处理和日志记录
 - ✅ **状态管理**：支持账户状态查询和管理
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/hillghost86/OpenClawWeChat/main/images/clawchat0.jpg" alt="ClawChat 截图 1" width="300"/>
-  <img src="https://raw.githubusercontent.com/hillghost86/OpenClawWeChat/main/images/clawchat1.jpg" alt="ClawChat 截图 2" width="300"/>
-</div>
-<div align="center">
-  <img src="https://raw.githubusercontent.com/hillghost86/OpenClawWeChat/main/images/clawchat2.jpg" alt="ClawChat 截图 3" width="300"/>
-  <img src="https://raw.githubusercontent.com/hillghost86/OpenClawWeChat/main/images/clawchat3.jpg" alt="ClawChat 截图 4" width="300"/>
-</div>
+<p align="center">
+  <img src="images/clawchat0.jpg" alt="ClawChat 截图 1" width="300"/>
+  <img src="images/clawchat1.jpg" alt="ClawChat 截图 2" width="300"/>
+</p>
+<p align="center">
+  <img src="images/clawchat2.jpg" alt="ClawChat 截图 3" width="300"/>
+  <img src="images/clawchat3.jpg" alt="ClawChat 截图 4" width="300"/>
+</p>
 
 ## 📋 前置要求
 
