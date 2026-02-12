@@ -425,7 +425,7 @@ openclaw gateway restart
 **A:** 尝试：
 1. 更新微信到最新版本
 2. 在微信中搜索"ClawChat"
-3. 通过二维码扫描进入（见上方截图）
+
 
 ---
 
