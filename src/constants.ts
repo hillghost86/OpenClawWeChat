@@ -11,7 +11,7 @@
  * - openclaw.plugin.json
  * - index.ts（引用此常量）
  */
-export const PLUGIN_VERSION = "1.0.10";
+export const PLUGIN_VERSION = "1.0.11";
 
 /**
  * 插件 ID（必须与 openclaw.plugin.json 中的 id 一致）

@@ -7,6 +7,7 @@
 import { getWechatMiniprogramRuntime } from "./runtime.js";
 import { sendReply, ReplyConfig } from "./reply-sender.js";
 import { CHANNEL_ID, BRIDGE_URL } from "./constants.js";
+import { notifyTyping } from "./typing.js";
 
 export interface MessageToInject {
   openid: string;
@@ -189,6 +190,9 @@ export async function injectMessage(
     uploadDocumentAPIURL: uploadDocumentAPIURL,
   };
 
+  // 开始处理前通知「正在输入」，后端通过 WebSocket 推送给小程序
+  await notifyTyping(config.apiKey, "start", log);
+
   // 使用 runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher 注入消息
   // 跟踪已发送的回复数量，第一条回复使用回复ID，后续回复不使用回复ID
   let replyCount = 0;
@@ -196,6 +200,10 @@ export async function injectMessage(
     ctx: msgContext,
     cfg: cfg,
     dispatcherOptions: {
+      onReplyStart: async () => {
+        // 模型开始生成时再次通知，保持 typing 在长任务期间不消失
+        await notifyTyping(config.apiKey, "start", log);
+      },
       deliver: async (payload, info) => {
         // 当 AI 生成回复时，这个回调会被调用
         if (info.kind === "final") {
