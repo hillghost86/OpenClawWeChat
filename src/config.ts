@@ -14,7 +14,7 @@ export interface PluginConfig {
   bridgeUrl: string; // 从常量读取，不在配置中
   apiKey?: string;
   pollIntervalMs: number;
-  sessionKeyPrefix: string;
+  sessionKey: string;
   debug: boolean;
 }
 
@@ -26,12 +26,15 @@ export interface PluginConfig {
  */
 export function getPluginConfig(cfg?: OpenClawConfig): PluginConfig {
   const pluginConfig = cfg?.plugins?.entries?.[PLUGIN_ID]?.config || {};
-  
+  // 兼容旧配置 sessionKeyPrefix（已更名为 sessionKey）
+  const rawSessionKey =
+    pluginConfig.sessionKey ?? (pluginConfig as { sessionKeyPrefix?: string }).sessionKeyPrefix;
+
   return {
     bridgeUrl: BRIDGE_URL, // 使用代码常量，不从配置读取
     apiKey: pluginConfig.apiKey,
     pollIntervalMs: pluginConfig.pollIntervalMs ?? DEFAULT_CONFIG.pollIntervalMs,
-    sessionKeyPrefix: pluginConfig.sessionKeyPrefix || DEFAULT_CONFIG.sessionKeyPrefix,
+    sessionKey: rawSessionKey ?? DEFAULT_CONFIG.sessionKey,
     debug: pluginConfig.debug ?? DEFAULT_CONFIG.debug,
   };
 }

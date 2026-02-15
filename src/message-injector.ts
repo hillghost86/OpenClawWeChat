@@ -8,6 +8,7 @@ import { getWechatMiniprogramRuntime } from "./runtime.js";
 import { sendReply, ReplyConfig } from "./reply-sender.js";
 import { CHANNEL_ID, BRIDGE_URL } from "./constants.js";
 import { notifyTyping } from "./typing.js";
+import { resolveSession } from "./session.js";
 
 export interface MessageToInject {
   openid: string;
@@ -59,29 +60,28 @@ export async function injectMessage(
     throw new Error("dispatchReplyWithBufferedBlockDispatcher not available");
   }
 
-  // 先解析 agent route 以获取正确的 sessionKey
+  // 解析 session（使用 sessionKey，默认为 agent:main:main）
   if (!cfg) {
-    log?.warn?.(`[${config.accountId}] Config is undefined, cannot resolve route`);
+    log?.warn?.(`[${config.accountId}] Config is undefined, cannot resolve session`);
     throw new Error("Config is undefined");
   }
 
-  const route = runtime.channel.routing.resolveAgentRoute({
-    cfg: cfg,
-    channel: CHANNEL_ID,
+  const sessionResult = resolveSession({
+    cfg,
+    apiKey: config.apiKey,
     accountId: config.accountId,
-    peer: {
-      kind: "dm",
-      id: message.openid,
-    },
+    openid: message.openid,
+    runtime,
   });
 
-  // 使用 resolveAgentRoute 返回的 sessionKey（根据配置的 dmScope 自动构建）
-  const sessionKey = route.sessionKey;
+  const sessionKey = sessionResult.sessionKey;
+  const mainSessionKey = sessionResult.mainSessionKey;
+  const agentId = sessionResult.agentId;
 
   // 解析 store path，用于记录会话
   const storePath = runtime.channel.session.resolveStorePath(
     cfg?.session?.store,
-    { agentId: route.agentId }
+    { agentId }
   );
 
   // 构建消息体：如果没有文本但有媒体，设置占位符文本
@@ -143,7 +143,7 @@ export async function injectMessage(
         sessionKey: msgContext.SessionKey ?? sessionKey,
         ctx: msgContext,
         updateLastRoute: {
-          sessionKey: route.mainSessionKey || sessionKey,
+          sessionKey: mainSessionKey || sessionKey,
           channel: CHANNEL_ID,
           to: message.openid,
           accountId: config.accountId,

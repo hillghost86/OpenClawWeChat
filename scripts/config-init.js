@@ -31,7 +31,7 @@ function loadDefaultsFromManifest() {
       return {
         apiKey: PLACEHOLDER_API_KEY,
         pollIntervalMs: 2000,
-        sessionKeyPrefix: 'agent:main:wechat:miniprogram:',
+        sessionKey: 'agent:main:main',
         debug: false
       };
     }
@@ -54,7 +54,7 @@ function loadDefaultsFromManifest() {
     return {
       apiKey: PLACEHOLDER_API_KEY,
       pollIntervalMs: 2000,
-      sessionKeyPrefix: 'agent:main:wechat:miniprogram:',
+      sessionKey: 'agent:main:main',
       debug: false
     };
   }
@@ -144,6 +144,32 @@ function validateApiKey(apiKey) {
     return { valid: false, error: 'secret 应为 35 位字符' };
   }
   
+  return { valid: true };
+}
+
+// 验证 Session Key 格式（需符合 OpenClaw：agent:<agentId>:<rest>，至少 3 段）
+function validateSessionKey(sessionKey) {
+  if (!sessionKey || typeof sessionKey !== 'string') {
+    return { valid: false, error: 'Session Key 不能为空' };
+  }
+  const raw = sessionKey.trim();
+  if (!raw) {
+    return { valid: false, error: 'Session Key 不能为空' };
+  }
+  const parts = raw.split(':').filter(Boolean);
+  if (parts.length < 3) {
+    return { valid: false, error: '格式应为 agent:<agentId>:<rest>，至少 3 段，例如 agent:main:main' };
+  }
+  if (parts[0].toLowerCase() !== 'agent') {
+    return { valid: false, error: '必须以 agent: 开头' };
+  }
+  if (!parts[1]?.trim()) {
+    return { valid: false, error: 'agentId 不能为空' };
+  }
+  const rest = parts.slice(2).join(':');
+  if (!rest.trim()) {
+    return { valid: false, error: '第三段及之后不能为空' };
+  }
   return { valid: true };
 }
 
@@ -289,6 +315,17 @@ function filterDefaultValues(config, defaults) {
       continue;
     }
     
+    // Session Key：格式不符合则跳过，使用 schema 默认值
+    if (key === 'sessionKey') {
+      if (validateSessionKey(value).valid) {
+        const defaultValue = defaults[key];
+        if (defaultValue === undefined || value !== defaultValue) {
+          filtered[key] = value;
+        }
+      }
+      continue;
+    }
+    
     // 其他字段：如果与默认值不同，才保留
     const defaultValue = defaults[key];
     if (defaultValue === undefined || value !== defaultValue) {
@@ -351,12 +388,32 @@ async function promptConfig(rl, currentConfig = {}) {
   );
   config.pollIntervalMs = pollInterval ? parseInt(pollInterval, 10) : defaults.pollIntervalMs;
   
-  // Session Key 前缀
-  const sessionPrefix = await question(
-    rl,
-    `Session Key 前缀（默认 "${defaults.sessionKeyPrefix}"）: `
-  );
-  config.sessionKeyPrefix = sessionPrefix || defaults.sessionKeyPrefix;
+  // Session Key
+  console.log('');
+  printInfo('Session Key 用于标识会话，多 Agent 时需与 OpenClaw 的 session 配置一致');
+  printInfo('格式：agent:<agentId>:<rest>（如 agent:main:main），直接回车使用默认值');
+  let sessionKeyInput;
+  while (true) {
+    sessionKeyInput = await question(
+      rl,
+      `Session Key（默认 ${defaults.sessionKey}）: `
+    );
+    const value = sessionKeyInput ? sessionKeyInput.trim() : '';
+    if (!value) {
+      config.sessionKey = defaults.sessionKey;
+      break;
+    }
+    const validation = validateSessionKey(value);
+    if (validation.valid) {
+      config.sessionKey = value;
+      break;
+    }
+    printWarning(validation.error);
+  }
+  // 再次校验，防止意外写入无效值
+  if (!validateSessionKey(config.sessionKey).valid) {
+    config.sessionKey = defaults.sessionKey;
+  }
   
   // 调试模式
   const debug = await question(
@@ -392,7 +449,7 @@ async function main() {
   
   try {
     printHeader('╔════════════════════════════════════════╗');
-    printHeader('║   OpenClawWeChat 配置初始化脚本     ║');
+    printHeader('║   OpenClawWeChat 配置初始化脚本        ║');
     printHeader('╚════════════════════════════════════════╝');
     
     // 检查配置文件

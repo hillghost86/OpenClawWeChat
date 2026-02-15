@@ -32,7 +32,7 @@ node scripts/config-init.js
 |--------|------|------|--------|------|
 | `apiKey` | string | ✅ 是 | `YOUR_API_KEY_HERE` | API Key（格式：`bot_id:secret`） |
 | `pollIntervalMs` | number | ❌ 否 | `2000` | 轮询间隔（毫秒） |
-| `sessionKeyPrefix` | string | ❌ 否 | `agent:main:wechat:miniprogram:` | Session Key 前缀 |
+| `sessionKey` | string | ❌ 否 | `agent:main:main` | Session Key，格式：`agent:<agentId>:<rest>`，多 Agent 时需与 OpenClaw 一致 |
 | `debug` | boolean | ❌ 否 | `false` | 是否启用调试日志 |
 
 **重要提示：**

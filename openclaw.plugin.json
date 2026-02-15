@@ -2,7 +2,7 @@
   "id": "openclawwechat",
   "name": "OpenClawWeChat",
   "description": "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "type": "module",
   "main": "index.ts",
   "author": "OpenClaw Plugin Development",
@@ -21,10 +21,14 @@
         "default": 2000,
         "description": "轮询间隔（毫秒）"
       },
+      "sessionKey": {
+        "type": "string",
+        "default": "agent:main:main",
+        "description": "Session Key，用于标识会话"
+      },
       "sessionKeyPrefix": {
         "type": "string",
-        "default": "agent:main:wechat:miniprogram:",
-        "description": "Session Key 前缀"
+        "description": "[已弃用，请用 sessionKey] 兼容旧配置，当 sessionKey 未配置时使用"
       },
       "debug": {
         "type": "boolean",
@@ -32,9 +36,7 @@
         "description": "是否启用调试日志"
       }
     },
-    "required": [
-      "apiKey"
-    ]
+    "required": ["apiKey"]
   },
   "openclaw": {
     "channel": {
@@ -45,11 +47,7 @@
       "docsPath": "/channels/openclawwechat",
       "docsLabel": "openclawwechat",
       "systemImage": "bubble.left.and.text.bubble.right",
-      "aliases": [
-        "wechat",
-        "miniprogram",
-        "wx"
-      ]
+      "aliases": ["wechat", "miniprogram", "wx"]
     },
     "install": {
       "npmSpec": "openclawwechat",

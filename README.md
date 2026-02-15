@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/github/license/hillghost86/OpenClawWeChat?style=flat-square)](LICENSE)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-Compatible-green?style=flat-square)](https://openclaw.ai)
 
+
 OpenClawWeChat 可通过 ClawChat 的微信小程序实现 OpenClaw 与个人微信之间进行通讯会话。
 
 众所周知的原因，中国大陆无法使用 Telegram、WhatsApp 等工具与 OpenClaw 会话，虽然可以使用飞书、钉钉，但配置起来也比较复杂。而国民第一大 app 微信，却只支持企业微信，不支持个人微信。
@@ -214,7 +215,7 @@ npm run config-init
 |--------|------|------|--------|------|
 | `apiKey` | string | ✅ | - | API Key（格式：`bot_id:secret`） |
 | `pollIntervalMs` | number | ❌ | `2000` | 轮询间隔（毫秒） |
-| `sessionKeyPrefix` | string | ❌ | `agent:main:wechat:miniprogram:` | Session Key 前缀 |
+| `sessionKey` | string | ❌ | `agent:main:main` | Session Key，格式：`agent:<agentId>:<rest>` |
 | `debug` | boolean | ❌ | `false` | 是否启用调试日志 |
 
 ### 配置示例
@@ -235,7 +236,7 @@ npm run config-init
 {
   "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345",
   "pollIntervalMs": 2000,
-  "sessionKeyPrefix": "agent:main:wechat:miniprogram:",
+  "sessionKey": "agent:main:main",
   "debug": false
 }
 ```
@@ -543,6 +544,10 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
 - **GitHub:** [hillghost86/OpenClawWeChat](https://github.com/hillghost86/OpenClawWeChat)
 - **问题反馈:** [GitHub Issues](https://github.com/hillghost86/OpenClawWeChat/issues)
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=hillghost86/OpenClawWeChat&type=date&legend=top-left)](https://www.star-history.com/#hillghost86/OpenClawWeChat&type=date&legend=top-left)
+
 ### ⭐ 如果这个插件对你有帮助
 - 给个 ⭐ Star，让更多人看到！
 - 分享给你的朋友，一起用起来
@@ -560,6 +565,7 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
+
 
 ---
 

@@ -11,7 +11,7 @@
  * - openclaw.plugin.json
  * - index.ts（引用此常量）
  */
-export const PLUGIN_VERSION = "1.0.11";
+export const PLUGIN_VERSION = "1.0.12";
 
 /**
  * 插件 ID（必须与 openclaw.plugin.json 中的 id 一致）
@@ -34,6 +34,6 @@ export const BRIDGE_URL = "https://api.clawchat.mifengcdn.com";
  */
 export const DEFAULT_CONFIG = {
   pollIntervalMs: 2000,
-  sessionKeyPrefix: "agent:main:wechat:miniprogram:",
+  sessionKey: "agent:main:main",
   debug: false,
 } as const;

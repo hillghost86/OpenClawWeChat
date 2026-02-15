@@ -5,9 +5,21 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [1.0.12] - 2026-02-16
+
+### 改进
+- 🔧 重构会话session设置，默认使用 `agent:main:main`。
+- 🔧 配置项 `sessionKeyPrefix` 更名为 `sessionKey`，默认值 `agent:main:main`
+- 🔧 `config-init.js` 增加 Session Key 格式校验（需符合 OpenClaw：`agent:<agentId>:<rest>`）
+- 🔧 插件运行时校验 sessionKey 格式，无效时回退默认值
+
+### 兼容
+- 🔄 兼容旧配置项 `sessionKeyPrefix`，读取时优先 `sessionKey`，未配置时使用 `sessionKeyPrefix`
+
 ## [1.0.11] - 2026-02-12
+
 ### 新增
-- 新增openclaw 思考状态显示
+- 新增 openclaw 思考状态显示
 
 ## [1.0.10] - 2026-02-11
 

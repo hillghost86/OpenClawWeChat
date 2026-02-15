@@ -66,7 +66,7 @@ node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\config-init.js
 1. **输入 API Key** - 自动验证格式
 2. **配置其他选项**（可选，直接回车使用默认值）：
    - 轮询间隔（默认：2000ms）
-   - Session Key 前缀（默认：agent:main:wechat:miniprogram:）
+   - Session Key（默认：agent:main:main，格式：`agent:<agentId>:<rest>`）
    - 调试模式（默认：false）
 3. **确认保存** - 显示配置预览后保存
 
@@ -130,6 +130,12 @@ node scripts/config-init.js
 # 使用 node 直接运行（推荐）
 node scripts\config-init.js
 ```
+
+### Session Key 格式错误
+
+- 格式需为：`agent:<agentId>:<rest>`（至少 3 段）
+- 示例：`agent:main:main`、`agent:main:direct:user123`
+- 直接回车使用默认值 `agent:main:main`
 
 ### API Key 验证失败
 

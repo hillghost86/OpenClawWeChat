@@ -23,6 +23,7 @@ import { getWechatMiniprogramRuntime } from "./runtime.js";
 import { startPollingService } from "./polling.js";
 import { PLUGIN_ID, CHANNEL_ID, BRIDGE_URL } from "./constants.js";
 import { getPluginConfig, isConfigValid, type PluginConfig } from "./config.js";
+import { resolveSession } from "./session.js";
 
 // ==================== 类型定义 ====================
 
@@ -32,11 +33,11 @@ import { getPluginConfig, isConfigValid, type PluginConfig } from "./config.js";
 interface WeChatMiniprogramAccount {
   accountId: string;
   enabled: boolean;
-  config: {
+    config: {
     // bridgeUrl 不再从配置读取，使用代码常量 BRIDGE_URL
     apiKey?: string;
     pollIntervalMs?: number;
-    sessionKeyPrefix?: string;
+    sessionKey?: string;
     debug?: boolean;
   };
 }
@@ -145,7 +146,7 @@ const config: ChannelConfig<WeChatMiniprogramAccount> = {
         // bridgeUrl 不再存储在配置中，使用代码常量 BRIDGE_URL
         apiKey: pluginConfig.apiKey,
         pollIntervalMs: pluginConfig.pollIntervalMs,
-        sessionKeyPrefix: pluginConfig.sessionKeyPrefix,
+        sessionKey: pluginConfig.sessionKey,
         debug: pluginConfig.debug,
       },
     };
@@ -178,22 +179,25 @@ export const inbound: ChannelInbound<WeChatMiniprogramAccount> = {
    */
   receiveMessage: async (ctx) => {
     const { message, accountId, deps } = ctx;
-    // 优先使用 deps.runtime（如果可用），否则使用 getWechatMiniprogramRuntime()
     const runtime = deps?.runtime || getWechatMiniprogramRuntime();
+    const cfg = runtime.config?.loadConfig?.();
     
-    // 1. 解析消息
     const userMessage = {
-      // 根据你的消息格式解析
       openid: message.from?.id || message.from?.username,
       content: message.content || message.text,
       messageId: message.id,
       timestamp: message.timestamp || Date.now(),
     };
     
-    // 2. 构建 Session Key
-    // 确保 deps 和 deps.config 存在，如果不存在则使用 undefined（getPluginConfig 会处理）
     const pluginConfig = getPluginConfig(deps?.config);
-    const sessionKey = `${pluginConfig.sessionKeyPrefix}${userMessage.openid}`;
+    const sessionResult = resolveSession({
+      cfg: cfg || {},
+      apiKey: pluginConfig.apiKey || "",
+      accountId: accountId || "default",
+      openid: userMessage.openid,
+      runtime,
+    });
+    const sessionKey = sessionResult.sessionKey;
     
     // 3. 调用 OpenClaw Gateway API
     try {
