@@ -36,7 +36,9 @@
         "description": "是否启用调试日志"
       }
     },
-    "required": ["apiKey"]
+    "required": [
+      "apiKey"
+    ]
   },
   "openclaw": {
     "channel": {
@@ -47,7 +49,11 @@
       "docsPath": "/channels/openclawwechat",
       "docsLabel": "openclawwechat",
       "systemImage": "bubble.left.and.text.bubble.right",
-      "aliases": ["wechat", "miniprogram", "wx"]
+      "aliases": [
+        "wechat",
+        "miniprogram",
+        "wx"
+      ]
     },
     "install": {
       "npmSpec": "openclawwechat",
