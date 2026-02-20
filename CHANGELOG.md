@@ -5,6 +5,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [1.0.13] - 2026-02-21
+
+### 修复
+- 🐛 修复 auto-restart 导致多实例并行轮询、次数异常的问题（增加 cleanup、stopped 标志，stopAccount 调用 runPollingCleanup）
+- 🐛 修复 getUpdates、markProcessed 请求中 API Key 未 URL 编码的问题（冒号等特殊字符可能导致请求失败）
+
+### 改进
+- 🔧 默认轮询间隔由 2 秒调整为 5 秒（constants、openclaw.plugin.json、config-init.js）
+- 🔧 启动时输出当前轮询间隔日志，便于排查配置是否生效
+
 ## [1.0.12] - 2026-02-16
 
 ### 改进

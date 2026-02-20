@@ -9,3 +9,6 @@ publish.sh
 
 # npm包文件
 *.tgz
+
+# 文档
+docs/
