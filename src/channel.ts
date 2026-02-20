@@ -20,7 +20,7 @@ import type {
 } from "openclaw/plugin-sdk";
 import { resolveMediaPath } from "./media-handler.js";
 import { getWechatMiniprogramRuntime } from "./runtime.js";
-import { startPollingService } from "./polling.js";
+import { startPollingService, runPollingCleanup } from "./polling.js";
 import { PLUGIN_ID, CHANNEL_ID, BRIDGE_URL } from "./constants.js";
 import { getPluginConfig, isConfigValid, type PluginConfig } from "./config.js";
 import { resolveSession } from "./session.js";
@@ -578,11 +578,11 @@ const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
    */
   stopAccount: async (ctx) => {
     const { account } = ctx;
-    
+
     ctx.log?.info?.(`[${account.accountId}] Stopping WeChat MiniProgram account`);
-    
-    // 清理资源（停止轮询、关闭连接等）
-    
+
+    runPollingCleanup();
+
     return {
       running: false,
       lastStopAt: Date.now(),

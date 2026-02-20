@@ -21,6 +21,9 @@ import { downloadMedia } from "./media-handler.js";
 import { injectMessage } from "./message-injector.js";
 import { DEFAULT_CONFIG, BRIDGE_URL } from "./constants.js";
 
+/** 存储清理函数，供 stopAccount 调用，避免 auto-restart 时多实例并行轮询 */
+let activeCleanup: (() => void) | null = null;
+
 /**
  * 启动轮询服务
  * 
@@ -32,10 +35,11 @@ export async function startPollingService(ctx: GatewayStartContext) {
   const config = account.config;
   
   log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram polling service`);
-  
+
   // bridgeUrl 使用代码常量，不从配置读取
   const apiKey = config.apiKey;
   const pollInterval = config.pollIntervalMs ?? DEFAULT_CONFIG.pollIntervalMs;
+  log?.info?.(`[${account.accountId}] Polling interval: ${pollInterval}ms`);
   const debug = config.debug ?? DEFAULT_CONFIG.debug;
   
   // 预先读取 Gateway 配置（用于 HTTP API 备选方案）
@@ -50,11 +54,21 @@ export async function startPollingService(ctx: GatewayStartContext) {
   if (!apiKey) {
     throw new Error("API Key not configured");
   }
-  
+
+  // 先清理旧实例，避免 auto-restart 时多实例并行
+  if (activeCleanup) {
+    log?.info?.(`[${account.accountId}] Cleaning up previous polling instance`);
+    activeCleanup();
+    activeCleanup = null;
+  }
+
+  const encodedAPIKey = apiKey.replace(/:/g, "%3A");
+
   let offset = 0;
   let pollingTimer: NodeJS.Timeout | null = null;
   let pollCount = 0;
-  
+  let stopped = false;
+
   /**
    * 轮询函数
    */
@@ -65,7 +79,7 @@ export async function startPollingService(ctx: GatewayStartContext) {
     }
     
     pollCount++;
-    const pollUrl = `${BRIDGE_URL}/bot${apiKey}/getUpdates?offset=${offset}&limit=100&timeout=1`;
+    const pollUrl = `${BRIDGE_URL}/bot${encodedAPIKey}/getUpdates?offset=${offset}&limit=100&timeout=1`;
     
     if (debug && pollCount % 10 === 0) {
       log?.info?.(`[${account.accountId}] Polling #${pollCount}: offset=${offset}`);
@@ -163,7 +177,7 @@ export async function startPollingService(ctx: GatewayStartContext) {
           // 8. 标记消息为已处理（Telegram Bot API 兼容格式）
           try {
             const messageIds = updates.map((u: any) => u.update_id);
-            await fetch(`${BRIDGE_URL}/bot${apiKey}/markProcessed`, {
+            await fetch(`${BRIDGE_URL}/bot${encodedAPIKey}/markProcessed`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -177,18 +191,16 @@ export async function startPollingService(ctx: GatewayStartContext) {
       }
     } catch (error) {
       log?.error?.(`[${account.accountId}] Polling error: ${error}`);
-      
-      // 发生错误时，等待更长时间再重试
-      if (!abortSignal.aborted) {
+
+      if (!abortSignal.aborted && !stopped) {
         const retryDelay = pollInterval * 5;
         log?.warn?.(`[${account.accountId}] Retrying in ${retryDelay}ms...`);
         pollingTimer = setTimeout(poll, retryDelay);
       }
       return;
     }
-    
-    // 继续轮询
-    if (!abortSignal.aborted) {
+
+    if (!abortSignal.aborted && !stopped) {
       pollingTimer = setTimeout(poll, pollInterval);
     }
   };
@@ -196,33 +208,50 @@ export async function startPollingService(ctx: GatewayStartContext) {
   // 开始第一次轮询
   poll();
   
-  // 返回运行时状态
+  const cleanup = () => {
+    stopped = true;
+    if (pollingTimer) {
+      clearTimeout(pollingTimer);
+      pollingTimer = null;
+    }
+    if (activeCleanup === cleanup) {
+      activeCleanup = null;
+    }
+    log?.info?.(`[${account.accountId}] Polling service cleaned up`);
+  };
+
+  activeCleanup = cleanup;
+
   return {
     running: true,
     lastStartAt: Date.now(),
-    // 保存清理函数（可选）
-    cleanup: () => {
-      if (pollingTimer) {
-        clearTimeout(pollingTimer);
-        pollingTimer = null;
-      }
-      log?.info?.(`[${account.accountId}] Polling service cleaned up`);
-    },
+    cleanup,
   };
 }
 
 /**
+ * 执行轮询清理（清除 timer，停止后续轮询）
+ * 供 stopAccount 调用，避免 auto-restart 时多实例并行
+ */
+export function runPollingCleanup(): void {
+  if (activeCleanup) {
+    activeCleanup();
+    activeCleanup = null;
+  }
+}
+
+/**
  * 停止轮询服务
- * 
+ *
  * @param ctx - Gateway 停止上下文
  */
 export async function stopPollingService(ctx: any) {
   const { account, log } = ctx;
   
   log?.info?.(`[${account.accountId}] Stopping WeChat MiniProgram polling service`);
-  
-  // 清理工作（如果有 cleanup 函数，在这里调用）
-  
+
+  runPollingCleanup();
+
   return {
     running: false,
     lastStopAt: Date.now(),

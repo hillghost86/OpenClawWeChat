@@ -30,7 +30,7 @@ function loadDefaultsFromManifest() {
       console.warn(`⚠ 插件清单文件不存在: ${MANIFEST_FILE}，使用硬编码默认值`);
       return {
         apiKey: PLACEHOLDER_API_KEY,
-        pollIntervalMs: 2000,
+        pollIntervalMs: 5000,
         sessionKey: 'agent:main:main',
         debug: false
       };
@@ -53,7 +53,7 @@ function loadDefaultsFromManifest() {
     console.warn(`⚠ 读取插件清单失败: ${err.message}，使用硬编码默认值`);
     return {
       apiKey: PLACEHOLDER_API_KEY,
-      pollIntervalMs: 2000,
+      pollIntervalMs: 5000,
       sessionKey: 'agent:main:main',
       debug: false
     };

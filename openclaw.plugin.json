@@ -2,7 +2,7 @@
   "id": "openclawwechat",
   "name": "OpenClawWeChat",
   "description": "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "type": "module",
   "main": "index.ts",
   "author": "OpenClaw Plugin Development",
@@ -18,7 +18,7 @@
       },
       "pollIntervalMs": {
         "type": "number",
-        "default": 2000,
+        "default": 5000,
         "description": "轮询间隔（毫秒）"
       },
       "sessionKey": {

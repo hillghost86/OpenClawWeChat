@@ -98,7 +98,11 @@ export async function injectMessage(
     mediaPlaceholder = `<media:document>${message.mediaUrls.length > 1 ? ` (${message.mediaUrls.length} documents)` : ""}`;
   }
   
-  const finalBody = message.text || (message.mediaUrls.length > 0 ? mediaPlaceholder : "");
+  // 确保 body 非空：部分 LLM API（如 Zai/GLM）会拒绝 content[0].text 为空的消息
+  const finalBody =
+    message.text?.trim() ||
+    (message.mediaUrls.length > 0 ? mediaPlaceholder : "") ||
+    " "; // 兜底占位符，避免空字符串
 
   // 构建完整的 MsgContext（符合 OpenClaw SDK 的消息格式）
   const msgContext = runtime.channel.reply.finalizeInboundContext({
