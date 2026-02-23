@@ -61,23 +61,29 @@ node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\config-init.js
 
 ## 📝 配置流程
 
-运行脚本后，会依次提示：
+运行脚本后，会先进入模式选择：
 
-1. **输入 API Key** - 自动验证格式
-2. **配置其他选项**（可选，直接回车使用默认值）：
-   - 轮询间隔（默认：2000ms）
-   - Session Key（默认：agent:main:main，格式：`agent:<agentId>:<rest>`）
-   - 调试模式（默认：false）
-3. **确认保存** - 显示配置预览后保存
+1. `初始化/更新 ApiKey`（默认）
+   - 用于首次安装或存量升级
+   - 维护 `accounts.default`
+2. `新增 ApiKey`
+   - 在现有配置基础上新增非 `default` 账户
+3. `删除 ApiKey`
+   - 删除非 `default` 账户（`default` 不允许删除）
+
+输入规则：
+- API Key 格式必须为 `bot_id:secret`
+- 非 `default` 账户 `sessionKey` 必填，且格式必须为 `agent:<agentId>:<rest>`
+- `apiKey` 与 `sessionKey` 在账户间必须唯一
 
 ## 🎯 生成的配置
 
-脚本会在配置文件中添加或更新（只保存非默认值的配置项）：
+脚本会在配置文件中添加或更新（只保存非默认值）：
 
 - **macOS / Linux**: `~/.openclaw/openclaw.json`
 - **Windows**: `%USERPROFILE%\.openclaw\openclaw.json`
 
-**示例（最小配置）：**
+**示例（最小配置，单账户）：**
 
 ```json
 {
@@ -86,7 +92,40 @@ node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\config-init.js
       "openclawwechat": {
         "enabled": true,
         "config": {
-          "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+          "accounts": {
+            "default": {
+              "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**示例（多账户）：**
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclawwechat": {
+        "enabled": true,
+        "config": {
+          "defaults": {
+            "pollIntervalMs": 5000,
+            "debug": false
+          },
+          "accounts": {
+            "default": {
+              "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+            },
+            "bot2": {
+              "apiKey": "20231228:EXAMPLE_SECRET_KEY_35_CHARS_LONG_67890",
+              "sessionKey": "agent:main:wechat:bot2"
+            }
+          }
         }
       }
     }
@@ -135,7 +174,8 @@ node scripts\config-init.js
 
 - 格式需为：`agent:<agentId>:<rest>`（至少 3 段）
 - 示例：`agent:main:main`、`agent:main:direct:user123`
-- 直接回车使用默认值 `agent:main:main`
+- `default` 账户可为空（回落默认值）
+- 非 `default` 账户必须填写合法 `sessionKey`
 
 ### API Key 验证失败
 
@@ -143,6 +183,7 @@ node scripts\config-init.js
 - `bot_id` 应为数字
 - `secret` 应为 35 位字符
 - 从微信小程序 ClawChat 中获取
+- 不能与已有账户重复
 
 ### 配置文件不存在
 
@@ -160,9 +201,10 @@ New-Item -ItemType Directory -Force -Path $env:USERPROFILE\.openclaw
 
 ## 💡 使用技巧
 
-- **快速配置**：只输入 API Key，其他选项直接回车使用默认值
-- **更新配置**：如果配置已存在，脚本会询问是否更新
-- **最小化配置**：脚本只保存非默认值的配置项，让配置文件更简洁
+- **首次安装/升级**：先选 `初始化/更新 ApiKey`
+- **扩容账户**：再次运行脚本，选择 `新增 ApiKey`
+- **下线账户**：选择 `删除 ApiKey`
+- **最小化配置**：默认值不写入配置文件，配置更简洁
 
 ## 📚 相关文档
 

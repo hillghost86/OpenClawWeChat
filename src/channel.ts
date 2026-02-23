@@ -57,6 +57,46 @@ interface WeChatMiniprogramProbe {
   // 添加你的 Probe 字段
 }
 
+type LoggerLike = {
+  info?: (msg: string) => void;
+  warn?: (msg: string) => void;
+  error?: (msg: string) => void;
+};
+
+type ReceiveMessageContextLike = {
+  message: {
+    from?: { id?: string | number; username?: string };
+    content?: string;
+    text?: string;
+    id?: string | number;
+    timestamp?: number;
+  };
+  accountId?: string;
+  deps?: {
+    runtime?: ReturnType<typeof getWechatMiniprogramRuntime>;
+    config?: unknown;
+  };
+  log?: LoggerLike;
+};
+
+type SendContextLike = {
+  to: string;
+  text?: string;
+  mediaUrl?: string;
+  accountId?: string;
+  cfg?: unknown;
+  replyToId?: string | number;
+  log?: LoggerLike;
+};
+
+type StatusSnapshotLike = {
+  configured?: boolean;
+  running?: boolean;
+  lastStartAt?: number | null;
+  lastStopAt?: number | null;
+  lastError?: string | null;
+};
+
 // ==================== Meta 配置 ====================
 
 const meta: ChannelMeta = {
@@ -133,14 +173,14 @@ const config: ChannelConfig<WeChatMiniprogramAccount> = {
   /**
    * 列出所有账户 ID
    */
-  listAccountIds: (cfg) => {
+  listAccountIds: (cfg: unknown) => {
     return listAccountIdsFromConfig(cfg);
   },
 
   /**
    * 解析账户配置
    */
-  resolveAccount: (cfg, accountId) => {
+  resolveAccount: (cfg: unknown, accountId: string) => {
     // 使用统一的配置读取函数
     const resolvedAccountId = accountId || "default";
     const pluginConfig = getPluginConfig(cfg, resolvedAccountId);
@@ -161,14 +201,14 @@ const config: ChannelConfig<WeChatMiniprogramAccount> = {
   /**
    * 检查账户是否已配置
    */
-  isConfigured: (account) => {
+  isConfigured: (account: WeChatMiniprogramAccount) => {
     return isConfigValid(account.config as PluginConfig);
   },
 
   /**
    * 描述账户信息
    */
-  describeAccount: (account) => ({
+  describeAccount: (account: WeChatMiniprogramAccount) => ({
     accountId: account.accountId,
     enabled: account.enabled,
     configured: Boolean(account.config.apiKey?.trim()),
@@ -183,13 +223,13 @@ export const inbound: ChannelInbound<WeChatMiniprogramAccount> = {
    * 
    * 当外部平台有新消息时，OpenClaw 会调用此方法
    */
-  receiveMessage: async (ctx) => {
+  receiveMessage: async (ctx: ReceiveMessageContextLike) => {
     const { message, accountId, deps } = ctx;
     const runtime = deps?.runtime || getWechatMiniprogramRuntime();
     const cfg = runtime.config?.loadConfig?.();
     
     const userMessage = {
-      openid: message.from?.id || message.from?.username,
+      openid: String(message.from?.id ?? message.from?.username ?? ""),
       content: message.content || message.text,
       messageId: message.id,
       timestamp: message.timestamp || Date.now(),
@@ -246,7 +286,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
    * 处理 channel:openid 格式的 target，提取出 openid
    * 例如: "openclawwechat:onslD1wi_zoYBJggvREAPv-Dtl8E" -> "onslD1wi_zoYBJggvREAPv-Dtl8E"
    */
-  resolveTarget: ({ to, allowFrom, mode }) => {
+  resolveTarget: ({ to, allowFrom, mode: _mode }: { to?: string; allowFrom?: unknown[]; mode?: unknown }) => {
     const trimmed = to?.trim() ?? "";
     if (!trimmed) {
       // 如果没有提供 target，尝试使用 allowFrom 中的第一个
@@ -284,7 +324,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
   /**
    * 发送文本消息
    */
-  sendText: async (ctx) => {
+  sendText: async (ctx: SendContextLike) => {
     const { to, text, accountId, cfg, replyToId } = ctx;
     // 使用统一的配置读取函数
     const pluginConfig = getPluginConfig(cfg, accountId || "default");
@@ -304,7 +344,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
         body: JSON.stringify({
           chat_id: to,
           text,
-          reply_to_message_id: replyToId ? parseInt(replyToId) : undefined,
+          reply_to_message_id: replyToId ? Number(replyToId) : undefined,
         }),
       });
       
@@ -331,7 +371,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
   /**
    * 发送媒体消息
    */
-  sendMedia: async (ctx) => {
+  sendMedia: async (ctx: SendContextLike) => {
     const { to, text, mediaUrl, accountId, cfg, replyToId } = ctx;
     // 使用统一的配置读取函数
     // 使用 ctx.cfg 而不是 ctx.deps.config（与 sendText 保持一致）
@@ -470,7 +510,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
         });
       } else {
         // URL：使用JSON格式，后端会下载
-        const jsonBody: any = {
+        const jsonBody: Record<string, unknown> = {
           chat_id: to,
           [jsonFieldName]: mediaUrl, // 使用原始 URL，后端会处理下载和上传
           caption: text || undefined,
@@ -531,7 +571,7 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
   /**
    * 构建通道摘要
    */
-  buildChannelSummary: ({ snapshot }) => ({
+  buildChannelSummary: ({ snapshot }: { snapshot: StatusSnapshotLike }) => ({
     configured: snapshot.configured ?? false,
     running: snapshot.running ?? false,
     lastStartAt: snapshot.lastStartAt ?? null,
@@ -542,7 +582,7 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
   /**
    * 构建账户快照
    */
-  buildAccountSnapshot: ({ account, cfg, runtime }) => {
+  buildAccountSnapshot: ({ account, cfg: _cfg, runtime }: { account: WeChatMiniprogramAccount; cfg: unknown; runtime: StatusSnapshotLike }) => {
     return {
       accountId: account.accountId,
       enabled: account.enabled,
@@ -564,7 +604,7 @@ const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
    * 当用户启用通道时，OpenClaw 会调用此方法
    * 启动轮询服务从中转服务器获取新消息
    */
-  startAccount: async (ctx) => {
+  startAccount: async (ctx: { account: WeChatMiniprogramAccount; cfg?: unknown; log?: LoggerLike }) => {
     const { account } = ctx;
     
     ctx.log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram account`);
@@ -590,7 +630,7 @@ const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
    * 
    * 当用户禁用通道时，OpenClaw 会调用此方法
    */
-  stopAccount: async (ctx) => {
+  stopAccount: async (ctx: { account: WeChatMiniprogramAccount; log?: LoggerLike }) => {
     const { account } = ctx;
 
     ctx.log?.info?.(`[${account.accountId}] Stopping WeChat MiniProgram account`);

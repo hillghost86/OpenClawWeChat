@@ -225,7 +225,7 @@ export async function startPollingService(ctx: GatewayStartContext) {
   const encodedAPIKey = apiKey.replace(/:/g, "%3A");
 
   let offset = 0;
-  let pollingTimer: NodeJS.Timeout | null = null;
+  let pollingTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   let accountBlocked = false;
   const health: PollHealth = {

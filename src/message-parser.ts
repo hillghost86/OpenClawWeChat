@@ -12,6 +12,7 @@ export interface ParsedMessage {
   mediaTypes: string[];
   uploadAPIURL?: string;
   isVideo?: boolean; // 标记是否为视频
+  isDocument?: boolean; // 标记是否为文档
 }
 
 /**

@@ -120,7 +120,7 @@ export async function injectMessage(
     Provider: CHANNEL_ID,
     ChatType: "direct",
     Timestamp: Date.now(),
-    OriginatingChannel: CHANNEL_ID as const,
+    OriginatingChannel: CHANNEL_ID,
     OriginatingTo: `${CHANNEL_ID}:${message.openid}`,
     CommandSource: "text" as const, // 明确指定这是文本命令，确保 allowTextCommands 返回 true
     CommandAuthorized: true, // 授权命令执行，确保 isAuthorizedSender 为 true
@@ -152,7 +152,7 @@ export async function injectMessage(
           to: message.openid,
           accountId: config.accountId,
         },
-        onRecordError: (err) => {
+        onRecordError: (err: unknown) => {
           log?.warn?.(`[${config.accountId}] Failed to record inbound session: ${err}`);
         },
       });
@@ -208,17 +208,24 @@ export async function injectMessage(
         // 模型开始生成时再次通知，保持 typing 在长任务期间不消失
         await notifyTyping(config.apiKey, "start", log);
       },
-      deliver: async (payload, info) => {
+      deliver: async (payload: unknown, info: unknown) => {
         // 当 AI 生成回复时，这个回调会被调用
-        if (info.kind === "final") {
+        const replyKind =
+          info && typeof info === "object" && "kind" in info
+            ? (info as { kind?: string }).kind
+            : undefined;
+        if (replyKind === "final") {
           replyCount++;
           // 第一条回复使用 updateId 作为回复ID，后续回复不使用回复ID（作为独立消息发送）
           const replyToUpdateId = replyCount === 1 ? message.updateId : undefined;
-          
+          const payloadObj = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+
           // 传递媒体类型信息，以便 sendReply 判断是图片还是视频
           await sendReply(
             {
-              ...payload,
+              text: typeof payloadObj.text === "string" ? payloadObj.text : undefined,
+              mediaUrl: typeof payloadObj.mediaUrl === "string" ? payloadObj.mediaUrl : undefined,
+              mediaUrls: Array.isArray(payloadObj.mediaUrls) ? (payloadObj.mediaUrls as string[]) : undefined,
               mediaTypes: message.mediaTypes, // 传递媒体类型
             },
             message.openid,
@@ -229,8 +236,12 @@ export async function injectMessage(
           );
         }
       },
-      onError: (err, info) => {
-        log?.error?.(`[${config.accountId}] Reply dispatch error: ${err}, kind=${info.kind}`);
+      onError: (err: unknown, info: unknown) => {
+        const kind =
+          info && typeof info === "object" && "kind" in info
+            ? (info as { kind?: string }).kind
+            : "unknown";
+        log?.error?.(`[${config.accountId}] Reply dispatch error: ${err}, kind=${kind}`);
       },
     },
   });
