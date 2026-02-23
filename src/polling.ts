@@ -21,8 +21,167 @@ import { downloadMedia } from "./media-handler.js";
 import { injectMessage } from "./message-injector.js";
 import { DEFAULT_CONFIG, BRIDGE_URL } from "./constants.js";
 
-/** 存储清理函数，供 stopAccount 调用，避免 auto-restart 时多实例并行轮询 */
-let activeCleanup: (() => void) | null = null;
+/** 每个账户独立清理函数，避免账户间互相清理 */
+const activeCleanupByAccount = new Map<string, () => void>();
+
+const LONG_POLL_TIMEOUT_SECONDS = 25;
+const REQUEST_TIMEOUT_MS = 35_000;
+const BASE_RETRY_DELAY_MS = 2_000;
+const MAX_RETRY_DELAY_MS = 60_000;
+const RETRY_JITTER_RATIO = 0.2;
+const RECENT_UPDATE_ID_CACHE_SIZE = 2_000;
+
+type PollErrorKind =
+  | "auth"
+  | "rate_limit"
+  | "server"
+  | "network"
+  | "abort"
+  | "invalid_response"
+  | "unknown";
+
+type PollError = {
+  kind: PollErrorKind;
+  message: string;
+  status?: number;
+  retryAfterMs?: number;
+  retriable: boolean;
+  stopAccount: boolean;
+};
+
+type PollHealth = {
+  pollCount: number;
+  successCount: number;
+  failureCount: number;
+  consecutiveFailures: number;
+  lastSuccessAt?: number;
+  lastErrorAt?: number;
+  lastErrorKind?: PollErrorKind;
+};
+
+function buildJitteredDelay(baseDelayMs: number): number {
+  const jitter = Math.round(baseDelayMs * RETRY_JITTER_RATIO * Math.random());
+  return Math.max(500, baseDelayMs + jitter);
+}
+
+function computeRetryDelayMs(consecutiveFailures: number): number {
+  const exp = Math.max(0, consecutiveFailures - 1);
+  const base = Math.min(MAX_RETRY_DELAY_MS, BASE_RETRY_DELAY_MS * 2 ** exp);
+  return buildJitteredDelay(base);
+}
+
+function parseRetryAfterMs(headerValue: string | null): number | undefined {
+  if (!headerValue) return undefined;
+  const asSeconds = Number(headerValue);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return Math.min(MAX_RETRY_DELAY_MS, Math.max(BASE_RETRY_DELAY_MS, Math.round(asSeconds * 1000)));
+  }
+  const asDateMs = Date.parse(headerValue);
+  if (!Number.isNaN(asDateMs)) {
+    const delta = asDateMs - Date.now();
+    if (delta > 0) {
+      return Math.min(MAX_RETRY_DELAY_MS, Math.max(BASE_RETRY_DELAY_MS, delta));
+    }
+  }
+  return undefined;
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+  abortSignal: AbortSignal,
+): Promise<Response> {
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+  const onAbort = () => timeoutController.abort();
+  abortSignal.addEventListener("abort", onAbort);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: timeoutController.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+    abortSignal.removeEventListener("abort", onAbort);
+  }
+}
+
+function classifyPollError(error: unknown): PollError {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg === "ABORTED" || msg.includes("aborted")) {
+    return {
+      kind: "abort",
+      message: msg,
+      retriable: false,
+      stopAccount: false,
+    };
+  }
+  if (msg.startsWith("HTTP_")) {
+    const status = Number(msg.replace("HTTP_", ""));
+    if (status === 401 || status === 403) {
+      return {
+        kind: "auth",
+        message: `HTTP ${status}`,
+        status,
+        retriable: false,
+        stopAccount: true,
+      };
+    }
+    if (status === 429) {
+      return {
+        kind: "rate_limit",
+        message: "HTTP 429",
+        status,
+        retriable: true,
+        stopAccount: false,
+      };
+    }
+    if (status >= 500) {
+      return {
+        kind: "server",
+        message: `HTTP ${status}`,
+        status,
+        retriable: true,
+        stopAccount: false,
+      };
+    }
+  }
+  if (msg.startsWith("RATE_LIMIT:")) {
+    const raw = msg.replace("RATE_LIMIT:", "").trim();
+    const retryAfterMs = raw ? Number(raw) : NaN;
+    return {
+      kind: "rate_limit",
+      message: "Rate limit",
+      status: 429,
+      retryAfterMs: Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? retryAfterMs : undefined,
+      retriable: true,
+      stopAccount: false,
+    };
+  }
+  if (msg.startsWith("API_ERROR:")) {
+    return {
+      kind: "invalid_response",
+      message: msg,
+      retriable: true,
+      stopAccount: false,
+    };
+  }
+  if (msg.includes("fetch") || msg.includes("network") || msg.includes("timed out")) {
+    return {
+      kind: "network",
+      message: msg,
+      retriable: true,
+      stopAccount: false,
+    };
+  }
+  return {
+    kind: "unknown",
+    message: msg,
+    retriable: true,
+    stopAccount: false,
+  };
+}
 
 /**
  * 启动轮询服务
@@ -55,47 +214,78 @@ export async function startPollingService(ctx: GatewayStartContext) {
     throw new Error("API Key not configured");
   }
 
-  // 先清理旧实例，避免 auto-restart 时多实例并行
-  if (activeCleanup) {
+  // 仅清理同一 account 的旧实例，避免多账户互相影响
+  const previousCleanup = activeCleanupByAccount.get(account.accountId);
+  if (previousCleanup) {
     log?.info?.(`[${account.accountId}] Cleaning up previous polling instance`);
-    activeCleanup();
-    activeCleanup = null;
+    previousCleanup();
+    activeCleanupByAccount.delete(account.accountId);
   }
 
   const encodedAPIKey = apiKey.replace(/:/g, "%3A");
 
   let offset = 0;
-  let pollingTimer: NodeJS.Timeout | null = null;
-  let pollCount = 0;
+  let pollingTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
+  let accountBlocked = false;
+  const health: PollHealth = {
+    pollCount: 0,
+    successCount: 0,
+    failureCount: 0,
+    consecutiveFailures: 0,
+  };
+  const recentUpdateIds = new Set<number>();
+  const recentUpdateIdQueue: number[] = [];
+
+  const rememberUpdateId = (updateId: number) => {
+    if (recentUpdateIds.has(updateId)) return;
+    recentUpdateIds.add(updateId);
+    recentUpdateIdQueue.push(updateId);
+    if (recentUpdateIdQueue.length > RECENT_UPDATE_ID_CACHE_SIZE) {
+      const oldest = recentUpdateIdQueue.shift();
+      if (typeof oldest === "number") recentUpdateIds.delete(oldest);
+    }
+  };
+
+  const scheduleNext = (delayMs: number) => {
+    if (!abortSignal.aborted && !stopped && !accountBlocked) {
+      pollingTimer = setTimeout(poll, delayMs);
+    }
+  };
 
   /**
    * 轮询函数
    */
   const poll = async () => {
-    if (abortSignal.aborted) {
+    if (abortSignal.aborted || stopped || accountBlocked) {
       log?.info?.(`[${account.accountId}] Polling stopped (aborted)`);
       return;
     }
     
-    pollCount++;
-    const pollUrl = `${BRIDGE_URL}/bot${encodedAPIKey}/getUpdates?offset=${offset}&limit=100&timeout=1`;
+    health.pollCount++;
+    const pollUrl = `${BRIDGE_URL}/bot${encodedAPIKey}/getUpdates?offset=${offset}&limit=100&timeout=${LONG_POLL_TIMEOUT_SECONDS}`;
     
-    if (debug && pollCount % 10 === 0) {
-      log?.info?.(`[${account.accountId}] Polling #${pollCount}: offset=${offset}`);
+    if (debug && health.pollCount % 10 === 0) {
+      log?.info?.(
+        `[${account.accountId}] Polling #${health.pollCount}: offset=${offset}, consecutiveFailures=${health.consecutiveFailures}`,
+      );
     }
     
     try {
       // 1. 调用中转服务器 API 获取新消息（Telegram Bot API 兼容格式）
-      const response = await fetch(pollUrl, {
+      const response = await fetchWithTimeout(pollUrl, {
+        signal: abortSignal,
         headers: {
           'Content-Type': 'application/json',
         },
-      });
+      }, REQUEST_TIMEOUT_MS, abortSignal);
       
       if (!response.ok) {
-        log?.error?.(`[${account.accountId}] Polling failed: HTTP ${response.status} ${response.statusText}`);
-        throw new Error(`Polling failed: ${response.statusText}`);
+        if (response.status === 429) {
+          const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+          throw new Error(`RATE_LIMIT:${retryAfterMs ?? ""}`);
+        }
+        throw new Error(`HTTP_${response.status}`);
       }
       
       const data = await response.json();
@@ -105,8 +295,20 @@ export async function startPollingService(ctx: GatewayStartContext) {
       }
       
       if (!data.ok) {
-        log?.error?.(`[${account.accountId}] API error: ${data.error_code || 'unknown'} - ${data.description || 'Unknown error'}`);
-        throw new Error(`API error: ${data.description || 'Unknown error'}`);
+        const errorCode = Number(data.error_code);
+        const description = data.description || 'Unknown error';
+        if (errorCode === 429) {
+          const retryAfterSec = Number(data.parameters?.retry_after);
+          const retryAfterMs =
+            Number.isFinite(retryAfterSec) && retryAfterSec > 0
+              ? Math.round(retryAfterSec * 1000)
+              : undefined;
+          throw new Error(`RATE_LIMIT:${retryAfterMs ?? ""}`);
+        }
+        if (errorCode === 401 || errorCode === 403) {
+          throw new Error(`HTTP_${errorCode}`);
+        }
+        throw new Error(`API_ERROR:${description}`);
       }
       
       // 2. 处理返回的消息
@@ -116,11 +318,21 @@ export async function startPollingService(ctx: GatewayStartContext) {
         let processedCount = 0;
         
         for (const update of updates) {
+          if (typeof update?.update_id === "number" && recentUpdateIds.has(update.update_id)) {
+            if (debug) {
+              log?.info?.(`[${account.accountId}] Skip duplicated update_id=${update.update_id}`);
+            }
+            maxUpdateId = Math.max(maxUpdateId, update.update_id);
+            continue;
+          }
           // 3. 解析消息
           const parsedMessage = parseTelegramUpdate(update, account.accountId, log);
           if (!parsedMessage) {
             if (debug) {
               log?.info?.(`[${account.accountId}] Skipping update without message: update_id=${update.update_id}, type=${Object.keys(update).join(',')}`);
+            }
+            if (typeof update?.update_id === "number") {
+              rememberUpdateId(update.update_id);
             }
             continue;
           }
@@ -154,7 +366,6 @@ export async function startPollingService(ctx: GatewayStartContext) {
               },
               {
                 accountId: account.accountId,
-                bridgeUrl: BRIDGE_URL,
                 apiKey,
               },
               log
@@ -168,6 +379,7 @@ export async function startPollingService(ctx: GatewayStartContext) {
           
           // 6. 更新 maxUpdateId
           maxUpdateId = Math.max(maxUpdateId, parsedMessage.updateId);
+          rememberUpdateId(parsedMessage.updateId);
         }
         
         // 7. 更新 offset（使用 maxUpdateId + 1）
@@ -189,19 +401,37 @@ export async function startPollingService(ctx: GatewayStartContext) {
           }
         }
       }
+      health.successCount += 1;
+      health.consecutiveFailures = 0;
+      health.lastSuccessAt = Date.now();
+      scheduleNext(pollInterval);
     } catch (error) {
-      log?.error?.(`[${account.accountId}] Polling error: ${error}`);
-
-      if (!abortSignal.aborted && !stopped) {
-        const retryDelay = pollInterval * 5;
-        log?.warn?.(`[${account.accountId}] Retrying in ${retryDelay}ms...`);
-        pollingTimer = setTimeout(poll, retryDelay);
+      const classified = classifyPollError(error);
+      if (classified.kind === "abort" || abortSignal.aborted || stopped) {
+        return;
       }
-      return;
-    }
+      health.failureCount += 1;
+      health.consecutiveFailures += 1;
+      health.lastErrorAt = Date.now();
+      health.lastErrorKind = classified.kind;
 
-    if (!abortSignal.aborted && !stopped) {
-      pollingTimer = setTimeout(poll, pollInterval);
+      if (classified.stopAccount) {
+        accountBlocked = true;
+        log?.error?.(
+          `[${account.accountId}] Polling stopped due to auth error (${classified.status ?? "unknown"}). Please check API Key.`,
+        );
+        return;
+      }
+
+      const retryDelay =
+        classified.retryAfterMs ??
+        (classified.kind === "rate_limit"
+          ? buildJitteredDelay(10_000)
+          : computeRetryDelayMs(health.consecutiveFailures));
+      log?.warn?.(
+        `[${account.accountId}] Polling error kind=${classified.kind}, status=${classified.status ?? "-"}, message=${classified.message}; retry in ${retryDelay}ms`,
+      );
+      scheduleNext(retryDelay);
     }
   };
   
@@ -210,17 +440,16 @@ export async function startPollingService(ctx: GatewayStartContext) {
   
   const cleanup = () => {
     stopped = true;
+    accountBlocked = true;
     if (pollingTimer) {
       clearTimeout(pollingTimer);
       pollingTimer = null;
     }
-    if (activeCleanup === cleanup) {
-      activeCleanup = null;
-    }
+    activeCleanupByAccount.delete(account.accountId);
     log?.info?.(`[${account.accountId}] Polling service cleaned up`);
   };
 
-  activeCleanup = cleanup;
+  activeCleanupByAccount.set(account.accountId, cleanup);
 
   return {
     running: true,
@@ -233,10 +462,19 @@ export async function startPollingService(ctx: GatewayStartContext) {
  * 执行轮询清理（清除 timer，停止后续轮询）
  * 供 stopAccount 调用，避免 auto-restart 时多实例并行
  */
-export function runPollingCleanup(): void {
-  if (activeCleanup) {
-    activeCleanup();
-    activeCleanup = null;
+export function runPollingCleanup(accountId?: string): void {
+  if (accountId) {
+    const cleanup = activeCleanupByAccount.get(accountId);
+    if (cleanup) {
+      cleanup();
+      activeCleanupByAccount.delete(accountId);
+    }
+    return;
+  }
+
+  for (const [id, cleanup] of activeCleanupByAccount.entries()) {
+    cleanup();
+    activeCleanupByAccount.delete(id);
   }
 }
 
@@ -250,7 +488,7 @@ export async function stopPollingService(ctx: any) {
   
   log?.info?.(`[${account.accountId}] Stopping WeChat MiniProgram polling service`);
 
-  runPollingCleanup();
+  runPollingCleanup(account.accountId);
 
   return {
     running: false,

@@ -91,6 +91,22 @@ npm run config-init  # 输入你的 API Key
 openclaw gateway restart
 ```
 
+### 4️⃣ 多 API Key 账户配置（可选）
+如果你需要接入第二个及以上 API Key，再次运行配置脚本：
+
+```bash
+cd ~/.openclaw/extensions/openclawwechat
+npm run config-init
+```
+
+在菜单中选择：
+- `2) 新增 ApiKey`：添加新的账户
+- `3) 删除 ApiKey`：删除非 `default` 账户
+
+> 首次安装或升级迁移建议先选 `1) 初始化/更新 ApiKey` 完成 `default` 账户配置。
+
+
+
 ✅ 完成！打开 ClawChat 小程序即可开始对话。
 
 > 📖 **详细配置说明请查看下方的"安装与配置"章节**
@@ -192,7 +208,11 @@ npm run config-init
       "openclawwechat": {
         "enabled": true,
         "config": {
-          "apiKey": "your_bot_id:your_secret"
+          "accounts": {
+            "default": {
+              "apiKey": "your_bot_id:your_secret"
+            }
+          }
         }
       }
     }
@@ -204,40 +224,55 @@ npm run config-init
 > - API Key 可从**微信小程序 ClawChat** 中获取（我的页面 → APIKey管理）
 > - 只配置需要自定义的项，使用默认值的配置**不需要写入**配置文件
 > - OpenClaw 会自动从插件清单中读取默认值
+> - 配置脚本支持 `1) 初始化/更新 ApiKey 2) 新增 ApiKey 3) 删除 ApiKey`
 
 ---
 
 ## ⚙️ 配置说明
 
-### 配置项
+### 配置项（推荐结构）
 
 | 配置项 | 类型 | 必需 | 默认值 | 说明 |
 |--------|------|------|--------|------|
-| `apiKey` | string | ✅ | - | API Key（格式：`bot_id:secret`） |
-| `pollIntervalMs` | number | ❌ | `2000` | 轮询间隔（毫秒） |
-| `sessionKey` | string | ❌ | `agent:main:main` | Session Key，格式：`agent:<agentId>:<rest>` |
-| `debug` | boolean | ❌ | `false` | 是否启用调试日志 |
+| `config.accounts.default.apiKey` | string | ✅ | - | 默认账户 API Key（格式：`bot_id:secret`） |
+| `config.accounts.<id>.apiKey` | string | 多账户时 ✅ | - | 非 default 账户 API Key |
+| `config.accounts.<id>.sessionKey` | string | 非 default 账户 ✅ | - | 格式：`agent:<agentId>:<rest>`，且唯一 |
+| `config.defaults.pollIntervalMs` | number | ❌ | `5000` | 默认轮询间隔（毫秒） |
+| `config.defaults.debug` | boolean | ❌ | `false` | 默认是否启用调试日志 |
 
 ### 配置示例
 
-#### 最小配置
+#### 最小配置（单账户）
 
 > 💡 **获取 API Key：** 打开微信小程序 ClawChat，在设置或账户页面可以找到你的 API Key。
 
 ```json
 {
-  "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+  "accounts": {
+    "default": {
+      "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+    }
+  }
 }
 ```
 
-#### 完整配置
+#### 完整配置（多账户）
 
 ```json
 {
-  "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345",
-  "pollIntervalMs": 2000,
-  "sessionKey": "agent:main:main",
-  "debug": false
+  "defaults": {
+    "pollIntervalMs": 5000,
+    "debug": false
+  },
+  "accounts": {
+    "default": {
+      "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+    },
+    "bot2": {
+      "apiKey": "20231228:EXAMPLE_SECRET_KEY_35_CHARS_LONG_67890",
+      "sessionKey": "agent:main:wechat:bot2"
+    }
+  }
 }
 ```
 
@@ -439,7 +474,6 @@ openclaw gateway restart
 
 ```typescript
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
 import { wechatMiniprogramPlugin } from "./src/channel.js";
 import { setWechatMiniprogramRuntime } from "./src/runtime.js";
 import { PLUGIN_ID, PLUGIN_VERSION } from "./src/constants.js";
@@ -449,7 +483,14 @@ const plugin = {
   name: "OpenClawWeChat",
   description: "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
   version: PLUGIN_VERSION,
-  configSchema: emptyPluginConfigSchema(),
+  configSchema: {
+    type: "object",
+    properties: {
+      config: { type: "object" },
+      defaults: { type: "object" },
+      accounts: { type: "object" }
+    }
+  },
 
   register(api: OpenClawPluginApi) {
     setWechatMiniprogramRuntime(api.runtime);
@@ -506,7 +547,7 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
    - 检查网络连接
 
 3. **轮询未工作**
-   - 检查 `pollIntervalMs` 配置，默认是 2000ms
+   - 检查 `config.defaults.pollIntervalMs` 配置，默认是 5000ms
    - 查看轮询服务日志
 
 ### 调试模式
@@ -516,8 +557,14 @@ export function getWechatMiniprogramRuntime(): PluginRuntime {
 ```json
 {
   "config": {
-    "apiKey": "your_api_key",
-    "debug": true
+    "defaults": {
+      "debug": true
+    },
+    "accounts": {
+      "default": {
+        "apiKey": "your_api_key"
+      }
+    }
   }
 }
 ```

@@ -5,6 +5,30 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [1.1.0] - 2026-02-18
+
+### 新增
+- ✨ 多账户配置模型：统一使用 `plugins.entries.openclawwechat.config.accounts`（单账户也使用 `accounts.default`）
+- ✨ `config-init.js` 新交互流程：
+  - `1) 初始化/更新 ApiKey`
+  - `2) 新增 ApiKey`
+  - `3) 删除 ApiKey`（不允许删除 `default`）
+- ✨ 多账户轮询稳定性增强：
+  - 账户级隔离清理（按 `accountId`）
+  - 错误分类处理（401/403、429、5xx、网络错误）
+  - 指数退避 + jitter 重试
+  - 短期去重缓存（按 update_id）
+
+### 改进
+- 🔧 配置脚本统一输出推荐结构，默认值不落盘（仅保存用户自定义项）
+- 🔧 API Key 校验策略收敛为“输入阶段 + 保存阶段”双重严格校验
+- 🔧 README / 配置文档同步多账户结构与脚本流程
+- 🔧 类型与编译上下文增强，`tsc --noEmit` 可通过（不改变核心业务行为）
+
+### 修复
+- 🐛 修复轮询调用 `injectMessage` 的参数类型不匹配问题（移除无效 `bridgeUrl` 传参）
+- 🐛 修复版本号不一致问题（`package.json` / `constants.ts` / `openclaw.plugin.json` 统一为 `1.1.0`）
+
 ## [1.0.13] - 2026-02-21
 
 ### 修复
