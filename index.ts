@@ -8,7 +8,6 @@
  */
 
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
 import { wechatMiniprogramPlugin } from "./src/channel.js";
 import { setWechatMiniprogramRuntime } from "./src/runtime.js";
 import { PLUGIN_ID, PLUGIN_VERSION } from "./src/constants.js";
@@ -19,10 +18,26 @@ const plugin = {
   description: "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
   version: PLUGIN_VERSION,
   
-  // 配置 Schema
-  // 如果不需要配置，使用 emptyPluginConfigSchema()
-  // 如果需要配置，定义 JSON Schema
-  configSchema: emptyPluginConfigSchema(),
+  // 保持与 openclaw.plugin.json 的配置结构一致（兼容旧格式 + 推荐多账户结构）
+  configSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      apiKey: { type: "string" },
+      pollIntervalMs: { type: "number", minimum: 500, maximum: 60000 },
+      sessionKey: { type: "string" },
+      sessionKeyPrefix: { type: "string" },
+      debug: { type: "boolean" },
+      config: { type: "object" },
+      defaults: { type: "object" },
+      accounts: { type: "object" },
+    },
+    required: [],
+  },
+  reload: {
+    // 本插件配置位于 plugins.entries.openclawwechat
+    configPrefixes: ["plugins.entries.openclawwechat"],
+  },
   
   /**
    * 插件注册函数

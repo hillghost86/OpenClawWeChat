@@ -47,7 +47,7 @@ export function resolveSession(params: {
   openid: string;
   runtime?: unknown;
 }): SessionResult {
-  const pluginConfig = getPluginConfig(params.cfg);
+  const pluginConfig = getPluginConfig(params.cfg, params.accountId || "default");
   const raw = (pluginConfig.sessionKey ?? "").trim();
   const sessionKey =
     raw && isValidSessionKeyFormat(raw) ? raw : DEFAULT_CONFIG.sessionKey;

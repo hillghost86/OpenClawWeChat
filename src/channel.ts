@@ -21,8 +21,15 @@ import type {
 import { resolveMediaPath } from "./media-handler.js";
 import { getWechatMiniprogramRuntime } from "./runtime.js";
 import { startPollingService, runPollingCleanup } from "./polling.js";
-import { PLUGIN_ID, CHANNEL_ID, BRIDGE_URL } from "./constants.js";
-import { getPluginConfig, isConfigValid, type PluginConfig } from "./config.js";
+import { CHANNEL_ID, BRIDGE_URL } from "./constants.js";
+import {
+  getPluginConfig,
+  isConfigValid,
+  listAccountIds as listAccountIdsFromConfig,
+  isAccountEnabled,
+  validatePluginConfig,
+  type PluginConfig,
+} from "./config.js";
 import { resolveSession } from "./session.js";
 
 // ==================== 类型定义 ====================
@@ -127,9 +134,7 @@ const config: ChannelConfig<WeChatMiniprogramAccount> = {
    * 列出所有账户 ID
    */
   listAccountIds: (cfg) => {
-    // 从配置中读取账户列表
-    // 示例：返回 ["default"]
-    return ["default"];
+    return listAccountIdsFromConfig(cfg);
   },
 
   /**
@@ -137,11 +142,12 @@ const config: ChannelConfig<WeChatMiniprogramAccount> = {
    */
   resolveAccount: (cfg, accountId) => {
     // 使用统一的配置读取函数
-    const pluginConfig = getPluginConfig(cfg);
+    const resolvedAccountId = accountId || "default";
+    const pluginConfig = getPluginConfig(cfg, resolvedAccountId);
     
     return {
-      accountId: accountId || "default",
-      enabled: true,
+      accountId: resolvedAccountId,
+      enabled: isAccountEnabled(cfg, resolvedAccountId),
       config: {
         // bridgeUrl 不再存储在配置中，使用代码常量 BRIDGE_URL
         apiKey: pluginConfig.apiKey,
@@ -189,11 +195,12 @@ export const inbound: ChannelInbound<WeChatMiniprogramAccount> = {
       timestamp: message.timestamp || Date.now(),
     };
     
-    const pluginConfig = getPluginConfig(deps?.config);
+    const resolvedAccountId = accountId || "default";
+    const pluginConfig = getPluginConfig(deps?.config, resolvedAccountId);
     const sessionResult = resolveSession({
       cfg: cfg || {},
       apiKey: pluginConfig.apiKey || "",
-      accountId: accountId || "default",
+      accountId: resolvedAccountId,
       openid: userMessage.openid,
       runtime,
     });
@@ -280,7 +287,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
   sendText: async (ctx) => {
     const { to, text, accountId, cfg, replyToId } = ctx;
     // 使用统一的配置读取函数
-    const pluginConfig = getPluginConfig(cfg);
+    const pluginConfig = getPluginConfig(cfg, accountId || "default");
     const apiKey = pluginConfig.apiKey;
     
     if (!apiKey) {
@@ -328,7 +335,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
     const { to, text, mediaUrl, accountId, cfg, replyToId } = ctx;
     // 使用统一的配置读取函数
     // 使用 ctx.cfg 而不是 ctx.deps.config（与 sendText 保持一致）
-    const pluginConfig = getPluginConfig(cfg);
+    const pluginConfig = getPluginConfig(cfg, accountId || "default");
     const apiKey = pluginConfig.apiKey;
     
     if (!apiKey) {
@@ -561,6 +568,13 @@ const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
     const { account } = ctx;
     
     ctx.log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram account`);
+
+    const validation = validatePluginConfig(ctx.cfg);
+    if (!validation.ok) {
+      const errorMsg = validation.errors.join("; ");
+      ctx.log?.error?.(`[${account.accountId}] Invalid plugin config: ${errorMsg}`);
+      throw new Error(`Invalid plugin config: ${errorMsg}`);
+    }
     
     // 检查配置
     if (!account.config.apiKey?.trim()) {
@@ -581,7 +595,7 @@ const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
 
     ctx.log?.info?.(`[${account.accountId}] Stopping WeChat MiniProgram account`);
 
-    runPollingCleanup();
+    runPollingCleanup(account.accountId);
 
     return {
       running: false,

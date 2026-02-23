@@ -2,7 +2,7 @@
   "id": "openclawwechat",
   "name": "OpenClawWeChat",
   "description": "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
-  "version": "1.0.13",
+  "version": "1.1.0",
   "type": "module",
   "main": "index.ts",
   "author": "OpenClaw Plugin Development",
@@ -13,32 +13,111 @@
     "properties": {
       "apiKey": {
         "type": "string",
-        "default": "YOUR_API_KEY_HERE",
-        "description": "API Key（格式：bot_id:secret）"
+        "description": "[兼容旧格式] API Key（格式：bot_id:secret）"
       },
       "pollIntervalMs": {
         "type": "number",
         "default": 5000,
-        "description": "轮询间隔（毫秒）"
+        "minimum": 500,
+        "maximum": 60000,
+        "description": "[兼容旧格式] 轮询间隔（毫秒）"
       },
       "sessionKey": {
         "type": "string",
         "default": "agent:main:main",
-        "description": "Session Key，用于标识会话"
+        "description": "[兼容旧格式] Session Key，用于标识会话"
       },
       "sessionKeyPrefix": {
         "type": "string",
-        "description": "[已弃用，请用 sessionKey] 兼容旧配置，当 sessionKey 未配置时使用"
+        "description": "[已弃用，请用 sessionKey] 兼容旧配置"
       },
       "debug": {
         "type": "boolean",
         "default": false,
-        "description": "是否启用调试日志"
+        "description": "[兼容旧格式] 是否启用调试日志"
+      },
+      "config": {
+        "type": "object",
+        "description": "单账户兼容配置（有 config 且无 accounts 时按单账户处理）",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "description": "API Key（格式：bot_id:secret）"
+          },
+          "pollIntervalMs": {
+            "type": "number",
+            "default": 5000,
+            "minimum": 500,
+            "maximum": 60000,
+            "description": "轮询间隔（毫秒）"
+          },
+          "sessionKey": {
+            "type": "string",
+            "default": "agent:main:main",
+            "description": "Session Key，用于标识会话"
+          },
+          "sessionKeyPrefix": {
+            "type": "string",
+            "description": "[已弃用，请用 sessionKey] 兼容旧配置，当 sessionKey 未配置时使用"
+          },
+          "debug": {
+            "type": "boolean",
+            "default": false,
+            "description": "是否启用调试日志"
+          }
+        }
+      },
+      "defaults": {
+        "type": "object",
+        "description": "多账户默认配置",
+        "properties": {
+          "pollIntervalMs": {
+            "type": "number",
+            "default": 5000,
+            "minimum": 500,
+            "maximum": 60000
+          },
+          "debug": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "accounts": {
+        "type": "object",
+        "description": "多账户配置",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "description": "API Key（格式：bot_id:secret）"
+            },
+            "sessionKey": {
+              "type": "string",
+              "description": "Session Key，建议格式 agent:<agentId>:<rest>"
+            },
+            "pollIntervalMs": {
+              "type": "number",
+              "minimum": 500,
+              "maximum": 60000
+            },
+            "debug": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "是否启用该账户；false 时禁用"
+            }
+          },
+          "required": [
+            "apiKey"
+          ]
+        }
       }
     },
-    "required": [
-      "apiKey"
-    ]
+    "required": []
   },
   "openclaw": {
     "channel": {
