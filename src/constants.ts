@@ -11,7 +11,7 @@
  * - openclaw.plugin.json
  * - index.ts（引用此常量）
  */
-export const PLUGIN_VERSION = "1.1.0";
+export const PLUGIN_VERSION = "1.2.1";
 
 /**
  * 插件 ID（必须与 openclaw.plugin.json 中的 id 一致）
@@ -28,6 +28,7 @@ export const CHANNEL_ID = "openclawwechat";
  * 这样升级时不需要修改配置文件
  */
 export const BRIDGE_URL = "https://api.clawchat.mifengcdn.com";
+
 
 /**
  * 配置默认值（与 openclaw.plugin.json 中的 configSchema.default 保持一致）
