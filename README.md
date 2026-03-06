@@ -182,7 +182,7 @@ npm run config-init
 
 **Windows PowerShell：**
 ```powershell
-cd $env:USERPROFILE%\.openclaw\extensions\openclawwechat
+cd $env:USERPROFILE\.openclaw\extensions\openclawwechat
 npm run config-init
 ```
 
@@ -394,7 +394,7 @@ cd $env:USERPROFILE\.openclaw\extensions\openclawwechat
 npm run uninstall
 
 # 或使用node运行配置脚本
-node $env:USERPROFILE%\.openclaw\extensions\openclawwechat/scripts/uninstall.js
+node $env:USERPROFILE\.openclaw\extensions\openclawwechat\scripts\uninstall.js
 ```
 
 CMD 方法：

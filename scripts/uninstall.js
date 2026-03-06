@@ -25,7 +25,14 @@ const EXTENSIONS_DIR = path.join(
   '.openclaw',
   'extensions'
 );
-const PLUGIN_DIR = path.join(EXTENSIONS_DIR, PLUGIN_ID);
+// 插件目录：NPM 安装为 openclawwechat，GitHub 克隆为 OpenClawWeChat
+function resolvePluginDir() {
+  const npmPath = path.join(EXTENSIONS_DIR, PLUGIN_ID);
+  const gitPath = path.join(EXTENSIONS_DIR, 'OpenClawWeChat');
+  if (fs.existsSync(npmPath)) return npmPath;
+  if (fs.existsSync(gitPath)) return gitPath;
+  return npmPath; // 默认按 NPM 路径，removePluginDirectory 会检查存在性
+}
 
 // 颜色输出
 const colors = {
@@ -151,14 +158,15 @@ function hasPluginInstallRecord(config) {
   return Boolean(config?.plugins?.installs?.[PLUGIN_ID]);
 }
 
-// 删除插件目录
+// 删除插件目录（支持 NPM 与 GitHub 两种安装路径）
 function removePluginDirectory() {
-  if (!fs.existsSync(PLUGIN_DIR)) {
+  const pluginDir = resolvePluginDir();
+  if (!fs.existsSync(pluginDir)) {
     return { success: false, message: '插件目录不存在' };
   }
 
   try {
-    fs.rmSync(PLUGIN_DIR, { recursive: true, force: true });
+    fs.rmSync(pluginDir, { recursive: true, force: true });
     return { success: true, message: '插件目录已删除' };
   } catch (err) {
     return { success: false, message: `删除插件目录失败: ${err.message}` };
@@ -173,9 +181,10 @@ async function main() {
   console.log(colorize('═══════════════════════════════════════', 'bright'));
   console.log('');
 
-  // 检查配置文件和插件目录
+  // 检查配置文件和插件目录（支持 NPM 与 GitHub 两种安装路径）
   const configExists = fs.existsSync(CONFIG_FILE);
-  const pluginDirExists = fs.existsSync(PLUGIN_DIR);
+  const pluginDir = resolvePluginDir();
+  const pluginDirExists = fs.existsSync(pluginDir);
 
   if (!configExists && !pluginDirExists) {
     printInfo('配置文件和插件目录都不存在，无需卸载');
@@ -249,7 +258,7 @@ async function main() {
 
   // 显示插件目录信息
   if (pluginDirExists) {
-    printInfo(`检测到插件目录: ${PLUGIN_DIR}`);
+    printInfo(`检测到插件目录: ${pluginDir}`);
   }
 
   // 检测是否为交互式环境
@@ -387,7 +396,7 @@ async function main() {
       }
       if (shouldRemoveDir && !dirRemoved && pluginDirExists) {
         printWarning('插件目录未删除，需要手动删除:');
-        console.log(`   ${colorize(`rm -rf "${PLUGIN_DIR}"`, 'green')}`);
+        console.log(`   ${colorize(`rm -rf "${pluginDir}"`, 'green')}`);
       }
     }
 

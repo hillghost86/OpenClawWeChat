@@ -13,16 +13,22 @@ import { BRIDGE_URL } from "./constants.js";
 export async function notifyTyping(
   apiKey: string,
   status: "start" | "stop",
+  chatId?: number, // 群聊时传入负整数，私聊不传
   log?: { info?: (msg: string) => void; error?: (msg: string) => void }
 ): Promise<void> {
   const encodedAPIKey = apiKey.replace(/:/g, "%3A");
   const url = `${BRIDGE_URL}/bot${encodedAPIKey}/typing`;
 
+  const body: { status: string; chat_id?: number } = { status };
+  if (chatId != null && chatId < 0) {
+    body.chat_id = chatId;
+  }
+
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       log?.error?.(`typing notify failed: ${response.status} ${response.statusText}`);

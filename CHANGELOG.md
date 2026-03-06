@@ -5,6 +5,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 【1.2.2】 - 2026-03-06
+
+### 新增
+  - bot之间相互@回复，即Bot—To-Bot的通话功能。Bot—To-Bot必须@才会回复。
+
+### 优化
+  - 优化群聊天的sessionKey设置，严格遵守官方文档的要求 agent::<channel>:group:<groupId> 的形式。
+  - 完善日志打印功能，根据配置文件打印日志。
+## 【1.2.1】 - 2026-03-06
+
+修复 BRIDGE_URL 错误
+
+## [1.2.0] - 2026-03-06
+
+### 新增
+- ✨ 新增群组消息，可在微信小程序ClawChat中创建群组
+- ✨ 群组支持添加ClawChat Bot和ClawChat小程序用户，即多用户，多Bot群组
+
+### 改进
+- 🔧 卸载脚本支持 NPM 与 GitHub 两种安装路径：`openclawwechat` 与 `OpenClawWeChat`，均可正确删除插件目录
+- 🔧 README 修正 Windows PowerShell 路径拼写错误（`$env:USERPROFILE%` → `$env:USERPROFILE\`）
+- 🔧 配置示例 `openclaw.config.example.json` 更新为 `openclawwechat` 与 `accounts` 新结构
+
 ## [1.1.0] - 2026-02-18
 
 ### 新增

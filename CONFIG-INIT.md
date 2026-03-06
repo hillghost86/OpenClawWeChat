@@ -208,6 +208,5 @@ New-Item -ItemType Directory -Force -Path $env:USERPROFILE\.openclaw
 
 ## 📚 相关文档
 
-- [INSTALL.md](./INSTALL.md) - 安装指南
+- [README.md](./README.md) - 插件使用说明（含安装指南）
 - [CONFIG.md](./CONFIG.md) - 配置说明
-- [README.md](./README.md) - 插件说明

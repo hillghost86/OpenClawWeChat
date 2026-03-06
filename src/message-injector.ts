@@ -18,6 +18,10 @@ export interface MessageToInject {
   mediaTypes: string[];
   mediaPaths: string[];
   uploadAPIURL?: string;
+  chatId?: number; // 群聊时为负整数
+  chatType?: "private" | "group";
+  /** 是否需要触发回复；false 时仅 recordInboundSession，不调用 dispatchReply */
+  needReply?: boolean;
 }
 
 export interface InjectConfig {
@@ -43,7 +47,7 @@ export async function injectMessage(
   }
 ): Promise<void> {
   const runtime = getWechatMiniprogramRuntime();
-  
+
   // 记录 uploadAPIURL（用于调试）
   if (message.uploadAPIURL) {
     log?.info?.(`[${config.accountId}] Injecting message with upload API URL: ${message.uploadAPIURL}`);
@@ -71,12 +75,15 @@ export async function injectMessage(
     apiKey: config.apiKey,
     accountId: config.accountId,
     openid: message.openid,
+    chatId: message.chatId,
     runtime,
   });
 
   const sessionKey = sessionResult.sessionKey;
   const mainSessionKey = sessionResult.mainSessionKey;
   const agentId = sessionResult.agentId;
+  // 排查 Bot 回复到主 session：记录注入参数
+  log?.info?.(`[${config.accountId}] injectMessage: openid=${message.openid}, chatId=${message.chatId}, chatType=${message.chatType}, needReply=${message.needReply}, sessionKey=${sessionKey}`);
 
   // 解析 store path，用于记录会话
   const storePath = runtime.channel.session.resolveStorePath(
@@ -118,7 +125,7 @@ export async function injectMessage(
     MessageSid: String(message.updateId),
     Surface: CHANNEL_ID,
     Provider: CHANNEL_ID,
-    ChatType: "direct",
+    ChatType: message.chatType === "group" ? "group" : "direct",
     Timestamp: Date.now(),
     OriginatingChannel: CHANNEL_ID,
     OriginatingTo: `${CHANNEL_ID}:${message.openid}`,
@@ -142,12 +149,16 @@ export async function injectMessage(
   // 在调用 dispatchReplyWithBufferedBlockDispatcher 之前记录消息到会话存储
   if (runtime.channel.session.recordInboundSession && storePath) {
     try {
+      const routeSessionKey =
+        message.chatId != null && message.chatId < 0
+          ? sessionKey // 群聊：保持 per-group session，不要覆盖回主会话
+          : (mainSessionKey || sessionKey);
       await runtime.channel.session.recordInboundSession({
         storePath,
         sessionKey: msgContext.SessionKey ?? sessionKey,
         ctx: msgContext,
         updateLastRoute: {
-          sessionKey: mainSessionKey || sessionKey,
+          sessionKey: routeSessionKey,
           channel: CHANNEL_ID,
           to: message.openid,
           accountId: config.accountId,
@@ -159,6 +170,12 @@ export async function injectMessage(
     } catch (recordError) {
       log?.error?.(`[${config.accountId}] Failed to record inbound session: ${recordError}`);
     }
+  }
+
+  // need_reply=false：仅写入会话，不触发回复（polling 会在批次末尾 markProcessed）
+  if (message.needReply === false) {
+    log?.info?.(`[${config.accountId}] need_reply=false, skipping dispatch (update_id=${message.updateId})`);
+    return;
   }
 
   // 构建回复发送配置
@@ -194,8 +211,8 @@ export async function injectMessage(
     uploadDocumentAPIURL: uploadDocumentAPIURL,
   };
 
-  // 开始处理前通知「正在输入」，后端通过 WebSocket 推送给小程序
-  await notifyTyping(config.apiKey, "start", log);
+  // 开始处理前通知「正在输入」，后端通过 WebSocket 推送给小程序（群聊时传 chat_id）
+  await notifyTyping(config.apiKey, "start", message.chatId, log);
 
   // 使用 runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher 注入消息
   // 跟踪已发送的回复数量，第一条回复使用回复ID，后续回复不使用回复ID
@@ -206,29 +223,29 @@ export async function injectMessage(
     dispatcherOptions: {
       onReplyStart: async () => {
         // 模型开始生成时再次通知，保持 typing 在长任务期间不消失
-        await notifyTyping(config.apiKey, "start", log);
+        await notifyTyping(config.apiKey, "start", message.chatId, log);
       },
       deliver: async (payload: unknown, info: unknown) => {
-        // 当 AI 生成回复时，这个回调会被调用
         const replyKind =
           info && typeof info === "object" && "kind" in info
             ? (info as { kind?: string }).kind
             : undefined;
         if (replyKind === "final") {
           replyCount++;
-          // 第一条回复使用 updateId 作为回复ID，后续回复不使用回复ID（作为独立消息发送）
           const replyToUpdateId = replyCount === 1 ? message.updateId : undefined;
           const payloadObj = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+          const target = message.chatType === "group" && message.chatId != null ? message.chatId : message.openid;
+          // 排查 Bot 回复到主 session：记录 sendReply 目标
+          log?.info?.(`[${config.accountId}] sendReply: target=${target}, chatType=${message.chatType}, chatId=${message.chatId}, openid=${message.openid}, replyToUpdateId=${replyToUpdateId}`);
 
-          // 传递媒体类型信息，以便 sendReply 判断是图片还是视频
           await sendReply(
             {
               text: typeof payloadObj.text === "string" ? payloadObj.text : undefined,
               mediaUrl: typeof payloadObj.mediaUrl === "string" ? payloadObj.mediaUrl : undefined,
               mediaUrls: Array.isArray(payloadObj.mediaUrls) ? (payloadObj.mediaUrls as string[]) : undefined,
-              mediaTypes: message.mediaTypes, // 传递媒体类型
+              mediaTypes: message.mediaTypes,
             },
-            message.openid,
+            target,
             replyToUpdateId,
             replyConfig,
             config.accountId,

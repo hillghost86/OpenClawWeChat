@@ -28,9 +28,12 @@ export interface ReplyConfig {
  * @param accountId - 账户 ID（用于日志）
  * @param log - 日志函数
  */
+/** 回复目标：私聊为 openid 字符串，群聊为 chat_id 负整数 */
+type ReplyTarget = string | number;
+
 export async function sendReply(
   payload: { text?: string; mediaUrls?: string[]; mediaUrl?: string; mediaTypes?: string[] },
-  openid: string,
+  target: ReplyTarget, // openid (私聊) 或 chat_id (群聊负整数)
   updateId: number | undefined,
   config: ReplyConfig,
   accountId: string,
@@ -62,13 +65,13 @@ export async function sendReply(
         const isImage = mediaType.startsWith("image/");
         const isDocument = !isVideo && !isImage; // 非图片/视频的文档
 
-        await sendMedia(mediaSource, caption, openid, updateId, config, accountId, isVideo, isDocument, log);
+        await sendMedia(mediaSource, caption, target, updateId, config, accountId, isVideo, isDocument, log);
       }
     }
 
     // 如果有文本但没有媒体，或者文本太长需要单独发送
     if (text && (mediaUrls.length === 0 || text.length > 1024)) {
-      await sendText(text, openid, updateId, config, accountId, log);
+      await sendText(text, target, updateId, config, accountId, log);
     }
   } catch (sendError) {
     log?.error?.(`[${accountId}] Failed to send reply: ${sendError}`);
@@ -82,7 +85,7 @@ export async function sendReply(
 async function sendMedia(
   mediaSource: string,
   caption: string,
-  openid: string,
+  target: string | number,
   updateId: number | undefined,
   config: ReplyConfig,
   accountId: string,
@@ -143,10 +146,10 @@ async function sendMedia(
     parts.push(media.buffer);
     parts.push(encoder.encode(`\r\n`));
 
-    // 添加chat_id字段
+    // 添加chat_id字段（支持 openid 或群 chat_id）
     parts.push(encoder.encode(`--${boundary}\r\n`));
     parts.push(encoder.encode(`Content-Disposition: form-data; name="chat_id"\r\n\r\n`));
-    parts.push(encoder.encode(openid));
+    parts.push(encoder.encode(String(target)));
     parts.push(encoder.encode(`\r\n`));
 
     // 添加caption字段（如果有）
@@ -187,7 +190,7 @@ async function sendMedia(
   } else {
     // URL：使用JSON格式，后端会下载
     const jsonBody: any = {
-      chat_id: openid, // 使用 openid 作为 chat_id
+      chat_id: target, // openid 或群 chat_id
       caption: caption || undefined,
       reply_to_message_id: updateId ? parseInt(String(updateId)) : undefined,
     };
@@ -227,7 +230,7 @@ async function sendMedia(
  */
 async function sendText(
   text: string,
-  openid: string,
+  target: string | number,
   updateId: number | undefined,
   config: ReplyConfig,
   accountId: string,
@@ -246,7 +249,7 @@ async function sendText(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      chat_id: openid, // 使用 openid 作为 chat_id
+      chat_id: target, // openid 或群 chat_id
       text: text,
       reply_to_message_id: updateId ? parseInt(String(updateId)) : undefined,
     }),

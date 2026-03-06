@@ -190,6 +190,5 @@ openclaw logs --follow | grep "openclawwechat"
 
 ## 📚 相关文档
 
-- [README.md](./README.md) - 插件使用说明
+- [README.md](./README.md) - 插件使用说明（含安装指南）
 - [CONFIG-INIT.md](./CONFIG-INIT.md) - 配置脚本使用指南
-- [INSTALL.md](./INSTALL.md) - 安装指南

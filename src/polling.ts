@@ -21,6 +21,25 @@ import { downloadMedia } from "./media-handler.js";
 import { injectMessage } from "./message-injector.js";
 import { DEFAULT_CONFIG, BRIDGE_URL } from "./constants.js";
 
+/** 插件日志接口：info/warn 仅在 debug 时输出，error 始终输出 */
+type PluginLog = {
+  info?: (msg: string) => void;
+  warn?: (msg: string) => void;
+  error?: (msg: string) => void;
+};
+
+/**
+ * 根据 config.debug 包装原始 log：debug=true 时 info/warn 照常，debug=false 时 info/warn 不输出，error 始终输出
+ */
+function wrapLogByDebug(raw: PluginLog | undefined, debug: boolean): PluginLog {
+  if (!raw) return {};
+  return {
+    info: debug && raw.info ? (msg) => raw.info?.(msg) : () => {},
+    warn: debug && raw.warn ? (msg) => raw.warn?.(msg) : () => {},
+    error: raw.error ? (msg) => raw.error?.(msg) : undefined,
+  };
+}
+
 /** 每个账户独立清理函数，避免账户间互相清理 */
 const activeCleanupByAccount = new Map<string, () => void>();
 
@@ -190,26 +209,24 @@ function classifyPollError(error: unknown): PollError {
  * @returns 运行时状态
  */
 export async function startPollingService(ctx: GatewayStartContext) {
-  const { account, abortSignal, log, deps } = ctx;
+  const { account, abortSignal, log: rawLog, deps } = ctx;
   const config = account.config;
-  
+  const debug = config.debug ?? DEFAULT_CONFIG.debug;
+  const log = wrapLogByDebug(rawLog, debug);
+
   log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram polling service`);
 
   // bridgeUrl 使用代码常量，不从配置读取
   const apiKey = config.apiKey;
   const pollInterval = config.pollIntervalMs ?? DEFAULT_CONFIG.pollIntervalMs;
   log?.info?.(`[${account.accountId}] Polling interval: ${pollInterval}ms`);
-  const debug = config.debug ?? DEFAULT_CONFIG.debug;
-  
+
   // 预先读取 Gateway 配置（用于 HTTP API 备选方案）
   const gatewayConfig = deps?.config?.gateway || {};
   const gatewayPort = gatewayConfig.port || 18789;
   const gatewayToken = gatewayConfig.auth?.token || "";
-  
-  if (debug) {
-    log?.info?.(`[${account.accountId}] Gateway config: port=${gatewayPort}, token=${gatewayToken ? '***' + gatewayToken.slice(-4) : 'NOT FOUND'}`);
-  }
-  
+  log?.info?.(`[${account.accountId}] Gateway config: port=${gatewayPort}, token=${gatewayToken ? '***' + gatewayToken.slice(-4) : 'NOT FOUND'}`);
+
   if (!apiKey) {
     throw new Error("API Key not configured");
   }
@@ -265,7 +282,7 @@ export async function startPollingService(ctx: GatewayStartContext) {
     health.pollCount++;
     const pollUrl = `${BRIDGE_URL}/bot${encodedAPIKey}/getUpdates?offset=${offset}&limit=100&timeout=${LONG_POLL_TIMEOUT_SECONDS}`;
     
-    if (debug && health.pollCount % 10 === 0) {
+    if (health.pollCount % 10 === 0) {
       log?.info?.(
         `[${account.accountId}] Polling #${health.pollCount}: offset=${offset}, consecutiveFailures=${health.consecutiveFailures}`,
       );
@@ -290,7 +307,7 @@ export async function startPollingService(ctx: GatewayStartContext) {
       
       const data = await response.json();
       
-      if (debug && data.result?.length === 0) {
+      if (data.result?.length === 0) {
         log?.info?.(`[${account.accountId}] Polling response: ok=${data.ok}, result.length=0`);
       }
       
@@ -319,18 +336,14 @@ export async function startPollingService(ctx: GatewayStartContext) {
         
         for (const update of updates) {
           if (typeof update?.update_id === "number" && recentUpdateIds.has(update.update_id)) {
-            if (debug) {
-              log?.info?.(`[${account.accountId}] Skip duplicated update_id=${update.update_id}`);
-            }
+            log?.info?.(`[${account.accountId}] Skip duplicated update_id=${update.update_id}`);
             maxUpdateId = Math.max(maxUpdateId, update.update_id);
             continue;
           }
           // 3. 解析消息
           const parsedMessage = parseTelegramUpdate(update, account.accountId, log);
           if (!parsedMessage) {
-            if (debug) {
-              log?.info?.(`[${account.accountId}] Skipping update without message: update_id=${update.update_id}, type=${Object.keys(update).join(',')}`);
-            }
+            log?.info?.(`[${account.accountId}] Skipping update without message: update_id=${update.update_id}, type=${Object.keys(update).join(',')}`);
             if (typeof update?.update_id === "number") {
               rememberUpdateId(update.update_id);
             }
@@ -363,6 +376,9 @@ export async function startPollingService(ctx: GatewayStartContext) {
                 mediaTypes: parsedMessage.mediaTypes, // 使用解析出的媒体类型（包含视频信息）
                 mediaPaths: mediaInfo.mediaPaths,
                 uploadAPIURL: parsedMessage.uploadAPIURL,
+                chatId: parsedMessage.chatId,
+                chatType: parsedMessage.chatType,
+                needReply: parsedMessage.needReply,
               },
               {
                 accountId: account.accountId,
@@ -484,8 +500,10 @@ export function runPollingCleanup(accountId?: string): void {
  * @param ctx - Gateway 停止上下文
  */
 export async function stopPollingService(ctx: any) {
-  const { account, log } = ctx;
-  
+  const { account, log: rawLog } = ctx;
+  const debug = account?.config?.debug ?? DEFAULT_CONFIG.debug;
+  const log = wrapLogByDebug(rawLog, debug);
+
   log?.info?.(`[${account.accountId}] Stopping WeChat MiniProgram polling service`);
 
   runPollingCleanup(account.accountId);

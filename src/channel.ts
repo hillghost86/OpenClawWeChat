@@ -108,7 +108,7 @@ const meta: ChannelMeta = {
 // ==================== Capabilities 配置 ====================
 
 const capabilities = {
-  chatTypes: ["direct"],
+  chatTypes: ["direct", "group"],
   reactions: false,
   threads: false,
   media: true,
@@ -163,7 +163,13 @@ function looksLikeWeChatMiniprogramTargetId(raw: string, normalized?: string): b
   if (/^[a-zA-Z0-9_-]{20,}$/.test(trimmed)) {
     return true;
   }
-  
+
+  // 识别群 chat_id（负整数）
+  if (/^-?\d+$/.test(trimmed)) {
+    const n = parseInt(trimmed, 10);
+    if (n < 0) return true;
+  }
+
   return false;
 }
 
@@ -295,29 +301,48 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
         if (firstAllowed) {
           // 处理 allowFrom 中的 channel:openid 格式
           if (firstAllowed.startsWith(`${CHANNEL_ID}:`)) {
-            const openid = firstAllowed.slice(CHANNEL_ID.length + 1);
-            if (openid) {
-              return { ok: true, to: openid };
+            const rest = firstAllowed.slice(CHANNEL_ID.length + 1);
+            if (rest) {
+              // 群 chat_id 为负整数，需保持为 number
+              const n = parseInt(rest, 10);
+              if (!isNaN(n) && n < 0) {
+                return { ok: true, to: n };
+              }
+              return { ok: true, to: rest };
             }
+          }
+          const n = parseInt(firstAllowed, 10);
+          if (!isNaN(n) && n < 0) {
+            return { ok: true, to: n };
           }
           return { ok: true, to: firstAllowed };
         }
       }
       return {
         ok: false,
-        error: new Error(`Target is required for WeChat MiniProgram. Use format: "${CHANNEL_ID}:<openid>" or just "<openid>"`),
+        error: new Error(`Target is required for WeChat MiniProgram. Use format: "${CHANNEL_ID}:<openid>" or "${CHANNEL_ID}:<chat_id>" or "<openid>" or negative <chat_id>`),
       };
     }
-    
-    // 处理 channel:openid 格式，提取 openid
+
+    // 处理 channel:openid 或 channel:chatId 格式
     if (trimmed.startsWith(`${CHANNEL_ID}:`)) {
-      const openid = trimmed.slice(CHANNEL_ID.length + 1);
-      if (openid) {
-        return { ok: true, to: openid };
+      const rest = trimmed.slice(CHANNEL_ID.length + 1);
+      if (rest) {
+        const n = parseInt(rest, 10);
+        if (!isNaN(n) && n < 0) {
+          return { ok: true, to: n };
+        }
+        return { ok: true, to: rest };
       }
     }
-    
-    // 如果已经是纯 openid，直接返回
+
+    // 群 chat_id 负整数
+    if (/^-?\d+$/.test(trimmed)) {
+      const n = parseInt(trimmed, 10);
+      if (n < 0) return { ok: true, to: n };
+    }
+
+    // 纯 openid
     return { ok: true, to: trimmed };
   },
   
@@ -335,8 +360,9 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
     }
     
     // 调用中转服务器 API（Telegram Bot API 兼容格式）
+    const encodedAPIKey = apiKey.replace(/:/g, '%3A');
     try {
-      const response = await fetch(`${BRIDGE_URL}/bot${apiKey}/sendMessage`, {
+      const response = await fetch(`${BRIDGE_URL}/bot${encodedAPIKey}/sendMessage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -467,10 +493,10 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
         parts.push(media.buffer);
         parts.push(encoder.encode(`\r\n`));
         
-        // 添加chat_id字段
+        // 添加chat_id字段（支持 openid 字符串或群 chat_id 数字）
         parts.push(encoder.encode(`--${boundary}\r\n`));
         parts.push(encoder.encode(`Content-Disposition: form-data; name="chat_id"\r\n\r\n`));
-        parts.push(encoder.encode(to));
+        parts.push(encoder.encode(String(to)));
         parts.push(encoder.encode(`\r\n`));
         
         // 添加caption字段（如果有）

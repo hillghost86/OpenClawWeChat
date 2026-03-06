@@ -4,6 +4,8 @@
  * 负责从 Telegram Bot API 兼容格式的 update 中提取消息内容
  */
 
+export type ChatType = "private" | "group";
+
 export interface ParsedMessage {
   openid: string;
   updateId: number;
@@ -13,6 +15,10 @@ export interface ParsedMessage {
   uploadAPIURL?: string;
   isVideo?: boolean; // 标记是否为视频
   isDocument?: boolean; // 标记是否为文档
+  chatId?: number; // 群聊时为负整数，私聊为 undefined
+  chatType?: ChatType; // private | group
+  /** 是否需要触发回复；need_reply=false 时仅写入会话历史，不调用 LLM */
+  needReply?: boolean;
 }
 
 /**
@@ -40,7 +46,24 @@ export function parseTelegramUpdate(
   }
 
   const updateId = update.update_id;
-  const uploadAPIURL = (update.message.chat as any)?.upload_api_url;
+  const chat = update.message.chat;
+  const uploadAPIURL = (chat as any)?.upload_api_url;
+  // 解析 chatId、chatType：私聊 chat.id 通常为正或不存在，群聊为负整数
+  let chatId: number | undefined;
+  let chatType: "private" | "group" | undefined;
+  if (chat && typeof (chat as any).id === "number") {
+    const cid = (chat as any).id;
+    if (cid < 0) {
+      chatId = cid;
+      chatType = ((chat as any).type === "supergroup") ? "group" : "group";
+    } else {
+      chatType = "private";
+    }
+  } else {
+    chatType = "private";
+  }
+  // 排查 Bot 回复到主 session：记录 chat 解析结果
+  log?.info?.(`[${accountId}] parseTelegramUpdate: update_id=${updateId}, chat.id=${(chat as any)?.id}, chat.type=${(chat as any)?.type}, chatId=${chatId}, chatType=${chatType}, from.is_bot=${(update.message.from as any)?.is_bot}, need_reply=${(update.message as any).need_reply}`);
   
   // 调试：记录是否获取到 upload_api_url
   if (!uploadAPIURL) {
@@ -118,6 +141,9 @@ export function parseTelegramUpdate(
   const isImage = mediaTypes.some(type => type.startsWith("image/"));
   const isDocument = mediaTypes.length > 0 && !isVideo && !isImage; // 非图片/视频的文档
 
+  // need_reply：Bridge 返回，缺省为 true（兼容旧版、私聊恒为 true）
+  const needReply = update.message.need_reply !== false;
+
   return {
     openid,
     updateId,
@@ -127,5 +153,8 @@ export function parseTelegramUpdate(
     uploadAPIURL,
     isVideo,
     isDocument,
+    chatId,
+    chatType,
+    needReply,
   };
 }

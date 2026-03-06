@@ -45,17 +45,25 @@ export function resolveSession(params: {
   apiKey: string;
   accountId: string;
   openid: string;
+  chatId?: number; // 群聊时为负整数
   runtime?: unknown;
 }): SessionResult {
   const pluginConfig = getPluginConfig(params.cfg, params.accountId || "default");
-  const raw = (pluginConfig.sessionKey ?? "").trim();
-  const sessionKey =
+  let raw = (pluginConfig.sessionKey ?? "").trim();
+  const baseSessionKey =
     raw && isValidSessionKeyFormat(raw) ? raw : DEFAULT_CONFIG.sessionKey;
 
-  const agentId = parseAgentIdFromSessionKey(sessionKey);
+  // OpenClaw 群聊要求：使用独立的 group session key，避免污染主会话
+  // 这里使用格式：agent:<agentId>:openclawwechat:group:<chatId>
+  // 私聊仍使用 baseSessionKey（主会话）
+  const agentId = parseAgentIdFromSessionKey(baseSessionKey);
+  let sessionKey = baseSessionKey;
+  if (params.chatId != null && params.chatId < 0) {
+    sessionKey = `agent:${agentId}:openclawwechat:group:${params.chatId}`;
+  }
   return {
     sessionKey,
-    mainSessionKey: sessionKey,
+    mainSessionKey: baseSessionKey,
     agentId,
     fromRoute: false,
   };
