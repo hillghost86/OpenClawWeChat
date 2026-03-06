@@ -5,6 +5,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 【1.2.3】 - 2026-03-06
+
+## 优化
+  - 规范 getUpdates 的 message.from 字段，新增open_id字段，规范 fast_name字段赋值。
+
 ## 【1.2.2】 - 2026-03-06
 
 ### 新增

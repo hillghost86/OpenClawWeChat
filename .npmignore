@@ -4,6 +4,9 @@
 .DS_Store
 *.log
 
+# 图片资源（不随 npm 包发布）
+images/
+
 # 构建产物
 dist/
 *.tsbuildinfo

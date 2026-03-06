@@ -32,14 +32,14 @@ export interface ParsedMessage {
 export function parseTelegramUpdate(
   update: any,
   accountId: string,
-  log?: { warn?: (msg: string) => void }
+  log?: { info?: (msg: string) => void; warn?: (msg: string) => void }
 ): ParsedMessage | null {
   if (!update.message) {
     return null;
   }
 
-  // 提取 openid
-  const openid = update.message.from?.username || update.message.from?.id?.toString();
+  // 提取 openid：优先 open_id（阶段一新增），兼容旧后端 username/id
+  const openid = (update.message.from as any)?.open_id ?? update.message.from?.username ?? update.message.from?.id?.toString();
   if (!openid) {
     log?.warn?.(`[${accountId}] Skipping message without openid: update_id=${update.update_id}`);
     return null;
