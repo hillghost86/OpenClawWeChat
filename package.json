@@ -1,6 +1,6 @@
 {
   "name": "openclawwechat",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "OpenClawWeChat - OpenClaw WeChat MiniProgram channel plugin",
   "keywords": [
     "openclaw",
@@ -31,7 +31,6 @@
     "CHANGELOG.md",
     "CONFIG.md",
     "EXAMPLE.md",
-    "INSTALL.md",
     "images/**/*"
   ],
   "scripts": {
