@@ -366,16 +366,28 @@ export async function startPollingService(ctx: GatewayStartContext) {
               log
             );
             
-            // 5. 注入消息到 OpenClaw
+            // 5. 下载/拉取完成后立即标记已处理，避免 injectMessage 耗时期间 gateway 重启导致同一条被再次拉取、重复下载（injectMessage 会等 Agent 回复，可能很久）
+            try {
+              await fetch(`${BRIDGE_URL}/bot${encodedAPIKey}/markProcessed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message_ids: [parsedMessage.updateId] }),
+              });
+            } catch (markErr) {
+              log?.warn?.(`[${account.accountId}] Failed to mark update_id=${parsedMessage.updateId} as processed: ${markErr}`);
+            }
+            
+            // 6. 注入消息到 OpenClaw（可能耗时较长）
             await injectMessage(
               {
                 openid: parsedMessage.openid,
                 updateId: parsedMessage.updateId,
                 text: parsedMessage.text,
                 mediaUrls: mediaInfo.mediaUrls,
-                mediaTypes: parsedMessage.mediaTypes, // 使用解析出的媒体类型（包含视频信息）
+                mediaTypes: parsedMessage.mediaTypes,
                 mediaPaths: mediaInfo.mediaPaths,
                 uploadAPIURL: parsedMessage.uploadAPIURL,
+                isVoice: parsedMessage.isVoice,
                 chatId: parsedMessage.chatId,
                 chatType: parsedMessage.chatType,
                 needReply: parsedMessage.needReply,
@@ -393,28 +405,14 @@ export async function startPollingService(ctx: GatewayStartContext) {
             // 继续处理其他消息，不中断轮询
           }
           
-          // 6. 更新 maxUpdateId
+          // 7. 更新 maxUpdateId 与去重缓存
           maxUpdateId = Math.max(maxUpdateId, parsedMessage.updateId);
           rememberUpdateId(parsedMessage.updateId);
         }
         
-        // 7. 更新 offset（使用 maxUpdateId + 1）
+        // 8. 推进 offset
         if (maxUpdateId > 0) {
           offset = maxUpdateId + 1;
-          
-          // 8. 标记消息为已处理（Telegram Bot API 兼容格式）
-          try {
-            const messageIds = updates.map((u: any) => u.update_id);
-            await fetch(`${BRIDGE_URL}/bot${encodedAPIKey}/markProcessed`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ message_ids: messageIds }),
-            });
-          } catch (error) {
-            log?.warn?.(`[${account.accountId}] Failed to mark messages as processed: ${error}`);
-          }
         }
       }
       health.successCount += 1;

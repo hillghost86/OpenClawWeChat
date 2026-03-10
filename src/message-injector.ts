@@ -18,6 +18,8 @@ export interface MessageToInject {
   mediaTypes: string[];
   mediaPaths: string[];
   uploadAPIURL?: string;
+  /** 是否为语音消息（message.voice），用于占位与 ReplyConfig */
+  isVoice?: boolean;
   chatId?: number; // 群聊时为负整数
   chatType?: "private" | "group";
   /** 是否需要触发回复；false 时仅 recordInboundSession，不调用 dispatchReply */
@@ -92,15 +94,18 @@ export async function injectMessage(
   );
 
   // 构建消息体：如果没有文本但有媒体，设置占位符文本
+  const hasVoice = message.isVoice === true;
   const hasVideo = message.mediaTypes.some(type => type.startsWith("video/"));
   const hasImage = message.mediaTypes.some(type => type.startsWith("image/"));
-  const hasDocument = message.mediaTypes.some(type => !type.startsWith("video/") && !type.startsWith("image/"));
+  const hasDocument = message.mediaTypes.some(type => !type.startsWith("video/") && !type.startsWith("image/")) && !hasVoice;
   
   let mediaPlaceholder = "";
   if (hasVideo) {
     mediaPlaceholder = `<media:video>${message.mediaUrls.length > 1 ? ` (${message.mediaUrls.length} videos)` : ""}`;
   } else if (hasImage) {
     mediaPlaceholder = `<media:image>${message.mediaUrls.length > 1 ? ` (${message.mediaUrls.length} images)` : ""}`;
+  } else if (hasVoice) {
+    mediaPlaceholder = `<media:voice>${message.mediaUrls.length > 1 ? ` (${message.mediaUrls.length} voice)` : ""}`;
   } else if (hasDocument) {
     mediaPlaceholder = `<media:document>${message.mediaUrls.length > 1 ? ` (${message.mediaUrls.length} documents)` : ""}`;
   }
@@ -179,36 +184,39 @@ export async function injectMessage(
   }
 
   // 构建回复发送配置
-  // 从 uploadAPIURL 推断视频和文档上传URL（如果后端没有提供）
-  // 后端现在会根据媒体类型提供正确的URL，但为了兼容性，仍然需要推断其他类型的URL
+  // 从 uploadAPIURL 推断视频、文档、语音上传 URL（如果后端没有提供）
   let uploadVideoAPIURL: string | undefined;
   let uploadDocumentAPIURL: string | undefined;
+  let uploadVoiceAPIURL: string | undefined;
   
   if (message.uploadAPIURL) {
-    // 从后端提供的URL推断其他类型的URL
-    // 支持 /sendPhoto, /sendVideo, /sendDocument 三种情况
+    const base = message.uploadAPIURL.replace(/\/send\w+$/, '');
     if (message.uploadAPIURL.includes('/sendPhoto')) {
       uploadVideoAPIURL = message.uploadAPIURL.replace('/sendPhoto', '/sendVideo');
       uploadDocumentAPIURL = message.uploadAPIURL.replace('/sendPhoto', '/sendDocument');
+      uploadVoiceAPIURL = message.uploadAPIURL.replace('/sendPhoto', '/sendVoice');
     } else if (message.uploadAPIURL.includes('/sendVideo')) {
-      uploadVideoAPIURL = message.uploadAPIURL; // 已经是视频URL
+      uploadVideoAPIURL = message.uploadAPIURL;
       uploadDocumentAPIURL = message.uploadAPIURL.replace('/sendVideo', '/sendDocument');
+      uploadVoiceAPIURL = message.uploadAPIURL.replace('/sendVideo', '/sendVoice');
     } else if (message.uploadAPIURL.includes('/sendDocument')) {
       uploadVideoAPIURL = message.uploadAPIURL.replace('/sendDocument', '/sendVideo');
-      uploadDocumentAPIURL = message.uploadAPIURL; // 已经是文档URL
+      uploadDocumentAPIURL = message.uploadAPIURL;
+      uploadVoiceAPIURL = message.uploadAPIURL.replace('/sendDocument', '/sendVoice');
     } else {
-      // 未知格式，尝试推断
-      uploadVideoAPIURL = message.uploadAPIURL.replace(/\/send\w+$/, '/sendVideo');
-      uploadDocumentAPIURL = message.uploadAPIURL.replace(/\/send\w+$/, '/sendDocument');
+      uploadVideoAPIURL = base + '/sendVideo';
+      uploadDocumentAPIURL = base + '/sendDocument';
+      uploadVoiceAPIURL = base + '/sendVoice';
     }
   }
   
   const replyConfig: ReplyConfig = {
-    bridgeUrl: BRIDGE_URL, // 使用代码常量，不从配置读取
+    bridgeUrl: BRIDGE_URL,
     apiKey: config.apiKey,
     uploadAPIURL: message.uploadAPIURL,
     uploadVideoAPIURL: uploadVideoAPIURL,
     uploadDocumentAPIURL: uploadDocumentAPIURL,
+    uploadVoiceAPIURL: uploadVoiceAPIURL,
   };
 
   // 开始处理前通知「正在输入」，后端通过 WebSocket 推送给小程序（群聊时传 chat_id）
@@ -234,16 +242,24 @@ export async function injectMessage(
           replyCount++;
           const replyToUpdateId = replyCount === 1 ? message.updateId : undefined;
           const payloadObj = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+          const mediaUrls = Array.isArray(payloadObj.mediaUrls) ? (payloadObj.mediaUrls as string[]) : (typeof payloadObj.mediaUrl === "string" ? [payloadObj.mediaUrl] : []);
+          // 回复媒体类型：优先使用 payload 的 mediaTypes（本条回复的类型），无或长度不匹配时留空，sendMedia 对本地路径会按 media.contentType 推断
+          const payloadMediaTypes = Array.isArray(payloadObj.mediaTypes) ? (payloadObj.mediaTypes as string[]) : undefined;
+          const mediaTypes = (payloadMediaTypes != null && payloadMediaTypes.length >= mediaUrls.length) ? payloadMediaTypes : undefined;
+          const mediaNames = Array.isArray(payloadObj.mediaNames) ? (payloadObj.mediaNames as string[]) : undefined;
+          const payloadMediaDurations = Array.isArray(payloadObj.mediaDurations) ? (payloadObj.mediaDurations as number[]) : undefined;
+          const mediaDurations = payloadMediaDurations != null && payloadMediaDurations.length >= mediaUrls.length ? payloadMediaDurations : undefined;
           const target = message.chatType === "group" && message.chatId != null ? message.chatId : message.openid;
-          // 排查 Bot 回复到主 session：记录 sendReply 目标
           log?.info?.(`[${config.accountId}] sendReply: target=${target}, chatType=${message.chatType}, chatId=${message.chatId}, openid=${message.openid}, replyToUpdateId=${replyToUpdateId}`);
 
           await sendReply(
             {
               text: typeof payloadObj.text === "string" ? payloadObj.text : undefined,
               mediaUrl: typeof payloadObj.mediaUrl === "string" ? payloadObj.mediaUrl : undefined,
-              mediaUrls: Array.isArray(payloadObj.mediaUrls) ? (payloadObj.mediaUrls as string[]) : undefined,
-              mediaTypes: message.mediaTypes,
+              mediaUrls,
+              mediaTypes: mediaTypes ?? undefined,
+              mediaNames,
+              mediaDurations,
             },
             target,
             replyToUpdateId,

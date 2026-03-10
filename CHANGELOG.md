@@ -5,10 +5,24 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+##  [1.2.4] - 2026-03-10
+
+###  新增
+  - 新增语音输入功能
+
+###  优化
+  - 优化openclaw发送语音文件与语音回复逻辑
+  - 优化媒体文件发送与接收逻辑
+  - 按openclaw要求设计媒体文件默认下载地址
+
+###  修复
+  - 修复语音文件按文档发送的bug
+
+
 ## 【1.2.3】 - 2026-03-06
 
-## 优化
-  - 规范 getUpdates 的 message.from 字段，新增open_id字段，规范 fast_name字段赋值。
+### 优化
+  - 优化
 
 ## 【1.2.2】 - 2026-03-06
 
@@ -18,6 +32,7 @@
 ### 优化
   - 优化群聊天的sessionKey设置，严格遵守官方文档的要求 agent::<channel>:group:<groupId> 的形式。
   - 完善日志打印功能，根据配置文件打印日志。
+
 ## 【1.2.1】 - 2026-03-06
 
 修复 BRIDGE_URL 错误

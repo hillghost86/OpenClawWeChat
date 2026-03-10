@@ -15,6 +15,7 @@ export interface ParsedMessage {
   uploadAPIURL?: string;
   isVideo?: boolean; // 标记是否为视频
   isDocument?: boolean; // 标记是否为文档
+  isVoice?: boolean; // 标记是否为语音消息（message.voice，与 document 互斥）
   chatId?: number; // 群聊时为负整数，私聊为 undefined
   chatType?: ChatType; // private | group
   /** 是否需要触发回复；need_reply=false 时仅写入会话历史，不调用 LLM */
@@ -91,6 +92,15 @@ export function parseTelegramUpdate(
       mediaUrls.push(largestPhoto.file_id);
       mediaTypes.push("image/jpeg"); // 默认 JPEG，实际类型可能不同
     }
+  }
+  // 检测语音消息（message.voice，与 document 互斥）
+  else if (update.message.voice) {
+    const voice = update.message.voice;
+    if (voice.file_id) {
+      mediaUrls.push(voice.file_id);
+      // 语音消息统一用 audio 类型，便于下载与注入；isVoice 标识为语音
+      mediaTypes.push("audio/ogg"); // 后端可能为 aac/mp3，插件按 URL 下载即可
+    }
   } else if (update.message.document) {
     // 检测文档消息（包括图片、视频和其他文档）
     const doc = update.message.document;
@@ -137,9 +147,10 @@ export function parseTelegramUpdate(
   messageText = messageText || captionText;
 
   // 判断媒体类型
+  const isVoice = !!(update.message.voice && update.message.voice.file_id);
   const isVideo = mediaTypes.some(type => type.startsWith("video/"));
   const isImage = mediaTypes.some(type => type.startsWith("image/"));
-  const isDocument = mediaTypes.length > 0 && !isVideo && !isImage; // 非图片/视频的文档
+  const isDocument = mediaTypes.length > 0 && !isVideo && !isImage && !isVoice; // 非图片/视频/语音的文档
 
   // need_reply：Bridge 返回，缺省为 true（兼容旧版、私聊恒为 true）
   const needReply = update.message.need_reply !== false;
@@ -153,6 +164,7 @@ export function parseTelegramUpdate(
     uploadAPIURL,
     isVideo,
     isDocument,
+    isVoice,
     chatId,
     chatType,
     needReply,
