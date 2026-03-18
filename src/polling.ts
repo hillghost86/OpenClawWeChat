@@ -362,6 +362,7 @@ export async function startPollingService(ctx: GatewayStartContext) {
             const mediaInfo = await downloadMedia(
               parsedMessage.mediaUrls,
               parsedMessage.mediaTypes,
+              parsedMessage.mediaFileNames || [],
               account.accountId,
               log
             );

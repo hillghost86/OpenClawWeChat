@@ -5,6 +5,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 【1.2.5】 - 2026-03-28
+
+### 优化
+  - 优化语音文件逻辑，后端给插件下发 message.voice 时，除了 file_id 和 duration，现在还会带上 mime_type 和 file_name。这样插件不需要再盲猜语音格式。
+
 ##  [1.2.4] - 2026-03-10
 
 ###  新增

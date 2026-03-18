@@ -42,6 +42,12 @@ function getExtensionFromMime(mimeType: string): string {
   return "";
 }
 
+function getExtensionFromFileName(fileName?: string): string {
+  if (!fileName) return "";
+  const ext = path.extname(fileName).trim().toLowerCase();
+  return ext || "";
+}
+
 /** 使用 Node fetch 直接下载 URL 到 buffer（插件内自实现，不依赖 channel.media） */
 async function fetchUrlToBuffer(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
   const res = await fetch(url, { redirect: "follow" });
@@ -66,6 +72,7 @@ async function fetchUrlToBuffer(url: string): Promise<{ buffer: ArrayBuffer; con
 export async function downloadMedia(
   mediaUrls: string[],
   mediaTypes: string[],
+  mediaFileNames: string[] = [],
   accountId: string,
   log?: { info?: (msg: string) => void; warn?: (msg: string) => void; error?: (msg: string) => void }
 ): Promise<MediaInfo> {
@@ -90,6 +97,7 @@ export async function downloadMedia(
     for (let i = 0; i < mediaUrls.length; i++) {
       const mediaUrl = mediaUrls[i];
       const mediaType = mediaTypes[i] || "image/jpeg";
+      const mediaFileName = mediaFileNames[i] || "";
 
       try {
         let buffer: ArrayBuffer;
@@ -110,13 +118,17 @@ export async function downloadMedia(
           continue;
         }
 
-        const ext = getExtensionFromMime(contentType) || ".bin";
+        const declaredExt = getExtensionFromFileName(mediaFileName) || getExtensionFromMime(mediaType);
+        const detectedExt = getExtensionFromMime(contentType);
+        const ext = declaredExt || detectedExt || ".bin";
         const name = `${Date.now()}_${i}${ext}`;
         const filePath = path.join(inboundDir, name);
         fs.writeFileSync(filePath, new Uint8Array(buffer));
 
         mediaPaths.push(filePath);
-        log?.info?.(`[${accountId}] Saved media ${i + 1}/${mediaUrls.length} to ${filePath}`);
+        log?.info?.(
+          `[${accountId}] Saved media ${i + 1}/${mediaUrls.length} to ${filePath} (declared=${mediaType || "-"}, detected=${contentType || "-"})`
+        );
       } catch (downloadError) {
         log?.error?.(`[${accountId}] Failed to download media ${i + 1}/${mediaUrls.length}: ${downloadError}`);
         // 下载失败时保留 URL，由 OpenClaw 直接访问

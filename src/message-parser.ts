@@ -12,6 +12,7 @@ export interface ParsedMessage {
   text: string;
   mediaUrls: string[];
   mediaTypes: string[];
+  mediaFileNames?: string[];
   uploadAPIURL?: string;
   isVideo?: boolean; // 标记是否为视频
   isDocument?: boolean; // 标记是否为文档
@@ -74,6 +75,20 @@ export function parseTelegramUpdate(
   // 提取媒体信息
   const mediaUrls: string[] = [];
   const mediaTypes: string[] = [];
+  const mediaFileNames: string[] = [];
+
+  const inferMimeTypeFromFileName = (fileName?: string): string | undefined => {
+    if (!fileName) return undefined;
+    const lower = fileName.toLowerCase();
+    if (lower.endsWith(".mp3")) return "audio/mpeg";
+    if (lower.endsWith(".m4a")) return "audio/mp4";
+    if (lower.endsWith(".aac")) return "audio/aac";
+    if (lower.endsWith(".ogg")) return "audio/ogg";
+    if (lower.endsWith(".wav")) return "audio/wav";
+    if (lower.endsWith(".webm")) return "audio/webm";
+    if (lower.endsWith(".mp4")) return "video/mp4";
+    return undefined;
+  };
 
   // 检测视频消息（优先从 video 字段提取）
   if (update.message.video) {
@@ -98,8 +113,8 @@ export function parseTelegramUpdate(
     const voice = update.message.voice;
     if (voice.file_id) {
       mediaUrls.push(voice.file_id);
-      // 语音消息统一用 audio 类型，便于下载与注入；isVoice 标识为语音
-      mediaTypes.push("audio/ogg"); // 后端可能为 aac/mp3，插件按 URL 下载即可
+      mediaTypes.push(voice.mime_type || inferMimeTypeFromFileName(voice.file_name) || "audio/mpeg");
+      mediaFileNames.push(voice.file_name || "");
     }
   } else if (update.message.document) {
     // 检测文档消息（包括图片、视频和其他文档）
@@ -110,6 +125,7 @@ export function parseTelegramUpdate(
       // 所有文档类型都添加到媒体列表
       mediaUrls.push(doc.file_id);
       mediaTypes.push(mimeType || "application/octet-stream");
+      mediaFileNames.push(doc.file_name || "");
     }
   }
 
@@ -161,6 +177,7 @@ export function parseTelegramUpdate(
     text: messageText,
     mediaUrls,
     mediaTypes,
+    mediaFileNames,
     uploadAPIURL,
     isVideo,
     isDocument,
