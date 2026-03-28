@@ -1,25 +1,19 @@
 /**
- * OpenClaw Channel Plugin 入口文件
- * 
- * 这是插件的入口点，负责：
- * 1. 定义插件元数据
- * 2. 注册 Channel Plugin
- * 3. 初始化 Runtime
+ * OpenClaw Channel Plugin 标准入口。
+ *
+ * 使用官方 defineChannelPluginEntry helper 对齐新版插件系统：
+ * - 设置 PluginRuntime
+ * - 注册 channel capability
+ * - 复用统一的 setup-only / full 模式装载逻辑
  */
 
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { defineChannelPluginEntry } from "openclaw/plugin-sdk/core";
 import { wechatMiniprogramPlugin } from "./src/channel.js";
 import { setWechatMiniprogramRuntime } from "./src/runtime.js";
 import { PLUGIN_ID, PLUGIN_VERSION } from "./src/constants.js";
 
-const plugin = {
-  id: PLUGIN_ID,
-  name: "OpenClawWeChat",
-  description: "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
-  version: PLUGIN_VERSION,
-  
-  // 保持与 openclaw.plugin.json 的配置结构一致（兼容旧格式 + 推荐多账户结构）
-  configSchema: {
+const pluginConfigSchema = {
+  jsonSchema: {
     type: "object",
     additionalProperties: false,
     properties: {
@@ -34,26 +28,57 @@ const plugin = {
     },
     required: [],
   },
-  reload: {
-    // 本插件配置位于 plugins.entries.openclawwechat
-    configPrefixes: ["plugins.entries.openclawwechat"],
+  uiHints: {
+    apiKey: {
+      label: "API Key",
+      help: "兼容旧单账户配置，格式为 bot_id:secret。",
+      sensitive: true,
+    },
+    pollIntervalMs: {
+      label: "轮询间隔",
+      help: "兼容旧单账户配置，单位毫秒。",
+      advanced: true,
+    },
+    sessionKey: {
+      label: "Session Key",
+      help: "兼容旧单账户配置，建议格式 agent:<agentId>:<rest>。",
+      advanced: true,
+    },
+    sessionKeyPrefix: {
+      label: "Session Key Prefix",
+      help: "已弃用，仅保留旧配置兼容。",
+      advanced: true,
+    },
+    debug: {
+      label: "调试日志",
+      help: "兼容旧单账户配置，开启详细日志输出。",
+      advanced: true,
+    },
+    config: {
+      label: "单账户配置",
+      help: "兼容单账户配置写法，后续推荐使用 defaults + accounts。",
+    },
+    defaults: {
+      label: "默认配置",
+      help: "多账户默认配置。",
+    },
+    accounts: {
+      label: "账户列表",
+      help: "多账户配置，推荐写法。",
+    },
   },
-  
-  /**
-   * 插件注册函数
-   * OpenClaw 加载插件时会调用此函数
-   * 
-   * @param api - OpenClaw Plugin API
-   */
-  register(api: OpenClawPluginApi) {
-    // 1. 设置 Runtime（用于访问 OpenClaw 运行时）
-    setWechatMiniprogramRuntime(api.runtime);
-    
-    // 2. 注册 Channel Plugin
-    // Channel Plugin 的消息处理通过 inbound 和 outbound 接口完成
-    // 不需要手动监听 chat 事件
-    api.registerChannel({ plugin: wechatMiniprogramPlugin });
-  },
-};
+} as const;
+
+const plugin = defineChannelPluginEntry({
+  id: PLUGIN_ID,
+  name: "OpenClawWeChat",
+  description: "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
+  plugin: wechatMiniprogramPlugin,
+  configSchema: pluginConfigSchema,
+  setRuntime: setWechatMiniprogramRuntime,
+});
+
+// 同步版本号，便于在插件列表与调试信息中展示。
+(plugin as { version?: string }).version = PLUGIN_VERSION;
 
 export default plugin;

@@ -2,7 +2,7 @@
   "id": "openclawwechat",
   "name": "OpenClawWeChat",
   "description": "OpenClawWeChat - WeChat MiniProgram channel plugin for OpenClaw",
-  "version": "1.2.5",
+  "version": "1.3.0",
   "type": "module",
   "main": "index.ts",
   "author": "OpenClaw Plugin Development",
@@ -119,25 +119,135 @@
     },
     "required": []
   },
-  "openclaw": {
-    "channel": {
-      "id": "openclawwechat",
+  "channels": [
+    "openclawwechat"
+  ],
+  "uiHints": {
+    "apiKey": {
+      "label": "API Key",
+      "help": "兼容旧单账户配置，格式为 bot_id:secret。",
+      "placeholder": "20231227:YOUR_SECRET_KEY",
+      "sensitive": true
+    },
+    "pollIntervalMs": {
+      "label": "轮询间隔",
+      "help": "兼容旧单账户配置，单位毫秒，范围 2000–60000。",
+      "placeholder": "5000",
+      "advanced": true
+    },
+    "sessionKey": {
+      "label": "Session Key",
+      "help": "兼容旧单账户配置，建议格式 agent:<agentId>:<rest>。",
+      "placeholder": "agent:main:main",
+      "advanced": true
+    },
+    "sessionKeyPrefix": {
+      "label": "Session Key Prefix",
+      "help": "已弃用，仅保留旧配置兼容。",
+      "advanced": true
+    },
+    "debug": {
+      "label": "调试日志",
+      "help": "兼容旧单账户配置，开启详细日志输出。",
+      "advanced": true
+    },
+    "config": {
+      "label": "单账户配置",
+      "help": "兼容单账户配置写法，后续推荐使用 defaults + accounts。",
+      "advanced": true
+    },
+    "defaults": {
+      "label": "默认配置",
+      "help": "所有账户共享的默认值，可被各账户覆盖。"
+    },
+    "defaults.pollIntervalMs": {
+      "label": "默认轮询间隔",
+      "help": "所有账户的默认轮询间隔（毫秒），各账户可单独覆盖。",
+      "placeholder": "5000",
+      "advanced": true
+    },
+    "defaults.debug": {
+      "label": "默认调试日志",
+      "help": "所有账户的默认调试开关，各账户可单独覆盖。",
+      "advanced": true
+    },
+    "accounts": {
+      "label": "账户列表",
+      "help": "多账户配置（推荐），每个 key 为账户 ID。"
+    },
+    "accounts.*.apiKey": {
+      "label": "API Key",
+      "help": "该账户的 ClawChat API Key，格式为 bot_id:secret，可从微信小程序 ClawChat 中获取。",
+      "placeholder": "20231227:YOUR_SECRET_KEY",
+      "sensitive": true
+    },
+    "accounts.*.sessionKey": {
+      "label": "Session Key",
+      "help": "该账户的会话标识，格式 agent:<agentId>:<rest>。default 账户可留空（默认 agent:main:main）。",
+      "placeholder": "agent:main:main",
+      "advanced": true
+    },
+    "accounts.*.pollIntervalMs": {
+      "label": "轮询间隔",
+      "help": "该账户的轮询间隔（毫秒），留空则继承 defaults。",
+      "placeholder": "5000",
+      "advanced": true
+    },
+    "accounts.*.debug": {
+      "label": "调试日志",
+      "help": "该账户是否开启调试日志，留空则继承 defaults。",
+      "advanced": true
+    },
+    "accounts.*.enabled": {
+      "label": "启用状态",
+      "help": "设为 false 可禁用该账户而不删除配置。"
+    }
+  },
+  "channelConfigs": {
+    "openclawwechat": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "apiKey": {
+            "type": "string"
+          },
+          "pollIntervalMs": {
+            "type": "number",
+            "minimum": 500,
+            "maximum": 60000
+          },
+          "sessionKey": {
+            "type": "string"
+          },
+          "sessionKeyPrefix": {
+            "type": "string"
+          },
+          "debug": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object"
+          },
+          "defaults": {
+            "type": "object"
+          },
+          "accounts": {
+            "type": "object"
+          }
+        },
+        "required": []
+      },
       "label": "OpenClawWeChat",
-      "selectionLabel": "OpenClawWeChat",
-      "blurb": "Bridge for OpenClaw to WeChat MiniProgram via HTTP polling",
+      "description": "Bridge for OpenClaw to WeChat MiniProgram via HTTP polling",
+      "blurb": "通过ClawChat微信小程序，与OpenClaw进行双向通讯。",
       "docsPath": "/channels/openclawwechat",
       "docsLabel": "openclawwechat",
-      "systemImage": "bubble.left.and.text.bubble.right",
       "aliases": [
         "wechat",
         "miniprogram",
         "wx"
       ]
-    },
-    "install": {
-      "npmSpec": "openclawwechat",
-      "localPath": "extensions/OpenClawWeChat",
-      "defaultChoice": "local"
     }
   }
 }

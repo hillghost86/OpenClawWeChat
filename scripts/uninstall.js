@@ -85,6 +85,19 @@ function question(rl, prompt) {
   });
 }
 
+function isYes(answer) {
+  const normalized = typeof answer === 'string' ? answer.trim().toLowerCase() : '';
+  return normalized === 'y' || normalized === 'yes';
+}
+
+function safeCwd() {
+  try {
+    return process.cwd();
+  } catch {
+    return '';
+  }
+}
+
 // 读取配置文件
 function readConfig() {
   try {
@@ -121,17 +134,31 @@ function hasPluginConfig(config) {
   return Boolean(config?.plugins?.entries?.[PLUGIN_ID]);
 }
 
+function hasPluginChannelConfig(config) {
+  return Boolean(config?.channels?.[PLUGIN_ID]);
+}
+
 // 删除插件配置
 function removePluginConfig(config) {
-  if (!config?.plugins?.entries?.[PLUGIN_ID]) {
+  if (!config || typeof config !== 'object') {
     return config;
   }
 
-  delete config.plugins.entries[PLUGIN_ID];
+  if (config?.plugins?.entries?.[PLUGIN_ID]) {
+    delete config.plugins.entries[PLUGIN_ID];
 
-  // 如果 entries 为空，清理结构
-  if (Object.keys(config.plugins.entries).length === 0) {
-    delete config.plugins.entries;
+    // 如果 entries 为空，清理结构
+    if (Object.keys(config.plugins.entries).length === 0) {
+      delete config.plugins.entries;
+    }
+  }
+
+  // 同步清理宿主识别通道已配置的最小 sentinel / channel config
+  if (config?.channels?.[PLUGIN_ID]) {
+    delete config.channels[PLUGIN_ID];
+    if (Object.keys(config.channels).length === 0) {
+      delete config.channels;
+    }
   }
 
   return config;
@@ -200,6 +227,8 @@ async function main() {
   let config = null;
   let hasConfig = false;
   let hasInstallRecord = false;
+  let hasChannelConfig = false;
+  const originalCwd = safeCwd();
 
   if (configExists) {
     config = readConfig();
@@ -209,17 +238,18 @@ async function main() {
     }
     hasConfig = hasPluginConfig(config);
     hasInstallRecord = hasPluginInstallRecord(config);
+    hasChannelConfig = hasPluginChannelConfig(config);
   }
 
   // 如果既没有配置也没有安装记录也没有目录，直接返回
-  if (!hasConfig && !hasInstallRecord && !pluginDirExists) {
+  if (!hasConfig && !hasInstallRecord && !hasChannelConfig && !pluginDirExists) {
     printInfo('未找到插件配置、安装记录和目录，无需卸载');
     return;
   }
 
   // 如果只有目录没有配置，仍然可以删除目录
-  if (!hasConfig && !hasInstallRecord && pluginDirExists) {
-    printWarning('配置文件中未找到插件配置和安装记录，但检测到插件目录');
+  if (!hasConfig && !hasInstallRecord && !hasChannelConfig && pluginDirExists) {
+    printWarning('配置文件中未找到插件配置、channel 配置和安装记录，但检测到插件目录');
     console.log('');
   }
 
@@ -236,6 +266,15 @@ async function main() {
       console.log(`  API Key: ${maskedApiKey}`);
     }
     console.log(`  启用状态: ${pluginConfig.enabled ? '已启用' : '已禁用'}`);
+    console.log('');
+  }
+
+  if (hasChannelConfig) {
+    printInfo('检测到 channel 配置:');
+    console.log(`  配置路径: channels.${PLUGIN_ID}`);
+    if (config.channels?.[PLUGIN_ID]?.mode) {
+      console.log(`  mode: ${config.channels[PLUGIN_ID].mode}`);
+    }
     console.log('');
   }
 
@@ -276,9 +315,15 @@ async function main() {
     if (hasConfig) {
       const configAnswer = await question(
         rl,
-        colorize('是否删除插件配置？(y/N): ', 'yellow')
+        colorize(`是否删除插件配置${hasChannelConfig ? '（含 channel sentinel）' : ''}？(y/N): `, 'yellow')
       );
-      shouldRemoveConfig = configAnswer.toLowerCase() === 'y' || configAnswer.toLowerCase() === 'yes';
+      shouldRemoveConfig = isYes(configAnswer);
+    } else if (hasChannelConfig) {
+      const channelConfigAnswer = await question(
+        rl,
+        colorize('是否删除残留的 channel 配置（channels.openclawwechat）？(y/N): ', 'yellow')
+      );
+      shouldRemoveConfig = isYes(channelConfigAnswer);
     }
 
     // 询问是否删除安装记录
@@ -287,7 +332,7 @@ async function main() {
         rl,
         colorize('是否删除插件安装记录？(y/N): ', 'yellow')
       );
-      shouldRemoveInstallRecord = installRecordAnswer.toLowerCase() === 'y' || installRecordAnswer.toLowerCase() === 'yes';
+      shouldRemoveInstallRecord = isYes(installRecordAnswer);
     }
 
     // 如果插件目录存在，询问是否删除目录
@@ -296,7 +341,7 @@ async function main() {
         rl,
         colorize('是否删除插件目录？(y/N): ', 'yellow')
       );
-      shouldRemoveDir = dirAnswer.toLowerCase() === 'y' || dirAnswer.toLowerCase() === 'yes';
+      shouldRemoveDir = isYes(dirAnswer);
     }
 
     rl.close();
@@ -314,6 +359,9 @@ async function main() {
       process.exit(1);
     }
     shouldRemoveConfig = hasConfig;
+    if (!shouldRemoveConfig && hasChannelConfig) {
+      shouldRemoveConfig = true;
+    }
     shouldRemoveInstallRecord = hasInstallRecord;
     shouldRemoveDir = pluginDirExists;
   }
@@ -323,15 +371,17 @@ async function main() {
   let dirRemoved = false;
 
   // 删除配置（如果配置存在）
-  if (shouldRemoveConfig && hasConfig) {
+  if (shouldRemoveConfig && (hasConfig || hasChannelConfig)) {
     config = removePluginConfig(config);
     if (writeConfig(config)) {
-      printSuccess('插件配置已从配置文件中删除');
+      printSuccess(
+        hasChannelConfig ? '插件配置与 channel 配置已从配置文件中删除' : '插件配置已从配置文件中删除'
+      );
       configRemoved = true;
     } else {
       printError('删除配置失败');
     }
-  } else if (shouldRemoveConfig && !hasConfig) {
+  } else if (shouldRemoveConfig && !hasConfig && !hasChannelConfig) {
     printWarning('配置不存在，跳过删除配置');
   }
 
@@ -366,6 +416,7 @@ async function main() {
     console.log('');
     const removedItems = [];
     if (configRemoved) removedItems.push('插件配置');
+    if (configRemoved && hasChannelConfig) removedItems.push('channel 配置');
     if (installRecordRemoved) removedItems.push('插件安装记录');
     if (dirRemoved) removedItems.push('插件目录');
     
@@ -402,6 +453,10 @@ async function main() {
 
     console.log('');
     printInfo('下一步：');
+    if (dirRemoved && pluginDir && originalCwd && originalCwd.startsWith(pluginDir)) {
+      printWarning('你当前终端原本位于刚删除的插件目录中，请先切换到其他目录后再执行后续命令:');
+      console.log(`   ${colorize('cd ~', 'green')}`);
+    }
     printInfo('重启 OpenClaw Gateway 以应用更改:');
     console.log(`   ${colorize('openclaw gateway restart', 'green')}`);
   } else {

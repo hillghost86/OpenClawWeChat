@@ -8,7 +8,7 @@
  * 旧格式仅在入口做一次映射，然后后续逻辑只读取 canonical。
  */
 
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
 import { PLUGIN_ID, DEFAULT_CONFIG, BRIDGE_URL } from "./constants.js";
 
 type SingleAccountFields = {
@@ -154,6 +154,116 @@ function normalizePluginConfigShape(cfg?: OpenClawConfig): CanonicalPluginConfig
   return out;
 }
 
+function sanitizeDefaults(defaults: DefaultsConfig): DefaultsConfig {
+  const out: DefaultsConfig = {};
+  if (typeof defaults.pollIntervalMs === "number") out.pollIntervalMs = defaults.pollIntervalMs;
+  if (typeof defaults.debug === "boolean") out.debug = defaults.debug;
+  return out;
+}
+
+function sanitizeAccountConfig(account: AccountConfig): AccountConfig {
+  const out: AccountConfig = {};
+  if (typeof account.apiKey === "string" && account.apiKey.trim()) out.apiKey = account.apiKey.trim();
+  if (typeof account.pollIntervalMs === "number") out.pollIntervalMs = account.pollIntervalMs;
+  if (typeof account.sessionKey === "string" && account.sessionKey.trim()) out.sessionKey = account.sessionKey.trim();
+  if (typeof account.debug === "boolean") out.debug = account.debug;
+  if (typeof account.enabled === "boolean") out.enabled = account.enabled;
+  return out;
+}
+
+/**
+ * 返回 canonical 配置结构。
+ *
+ * 该结构是插件内部后续逻辑唯一应依赖的配置视图：
+ * - defaults
+ * - accounts
+ */
+export function getCanonicalPluginConfigShape(cfg?: OpenClawConfig): CanonicalPluginConfig {
+  const normalized = normalizePluginConfigShape(cfg);
+  const accounts: Record<string, AccountConfig> = {};
+  for (const [accountId, account] of Object.entries(normalized.accounts ?? {})) {
+    const sanitized = sanitizeAccountConfig(account ?? {});
+    if (Object.keys(sanitized).length > 0) {
+      accounts[accountId] = sanitized;
+    }
+  }
+  return {
+    defaults: sanitizeDefaults(normalized.defaults),
+    accounts,
+  };
+}
+
+/**
+ * 将 canonical payload 规整为适合写回 `plugins.entries[PLUGIN_ID].config`
+ * 的最小结构。
+ */
+export function buildCanonicalPluginEntryPayload(input: CanonicalPluginConfig): CanonicalPluginConfig {
+  const defaults = sanitizeDefaults(input.defaults ?? {});
+  const accounts: Record<string, AccountConfig> = {};
+  for (const [accountId, account] of Object.entries(input.accounts ?? {})) {
+    const sanitized = sanitizeAccountConfig(account ?? {});
+    if (Object.keys(sanitized).length > 0) {
+      accounts[accountId] = sanitized;
+    }
+  }
+  return {
+    ...(Object.keys(defaults).length > 0 ? { defaults } : { defaults: {} }),
+    accounts,
+  };
+}
+
+/**
+ * 将 canonical plugin payload 写回 OpenClawConfig。
+ *
+ * 写回策略：
+ * - 永远写入 `plugins.entries[PLUGIN_ID].config`
+ * - 清理旧格式遗留字段
+ * - 保留其他插件与全局配置不变
+ */
+export function applyCanonicalPluginConfigToOpenClawConfig(params: {
+  cfg: OpenClawConfig;
+  payload: CanonicalPluginConfig;
+}): OpenClawConfig {
+  const next = structuredClone(params.cfg ?? {}) as OpenClawConfig & {
+    plugins?: {
+      enabled?: boolean;
+      entries?: Record<string, Record<string, unknown>>;
+    };
+    channels?: Record<string, Record<string, unknown>>;
+  };
+  if (!next.plugins) next.plugins = {};
+  if (!next.plugins.entries) next.plugins.entries = {};
+  const existing = (next.plugins.entries[PLUGIN_ID] ?? {}) as Record<string, unknown>;
+  next.plugins.entries[PLUGIN_ID] = {
+    ...existing,
+    enabled: true,
+    config: buildCanonicalPluginEntryPayload(params.payload),
+  };
+  delete next.plugins.entries[PLUGIN_ID].accounts;
+  delete next.plugins.entries[PLUGIN_ID].defaults;
+  delete next.plugins.entries[PLUGIN_ID].apiKey;
+  delete next.plugins.entries[PLUGIN_ID].pollIntervalMs;
+  delete next.plugins.entries[PLUGIN_ID].sessionKey;
+  delete next.plugins.entries[PLUGIN_ID].sessionKeyPrefix;
+  delete next.plugins.entries[PLUGIN_ID].debug;
+  if (!next.channels) next.channels = {};
+  // 为 gateway 启动阶段提供“已配置 channel”哨兵，避免宿主仅扫描 cfg.channels 时忽略该插件。
+  next.channels[PLUGIN_ID] = {
+    ...(next.channels[PLUGIN_ID] ?? {}),
+    mode: "polling",
+  };
+  return next as OpenClawConfig;
+}
+
+/**
+ * 是否已具备最小可用配置。
+ */
+export function isPluginConfigured(cfg?: OpenClawConfig): boolean {
+  const canonical = getCanonicalPluginConfigShape(cfg);
+  const defaultAccount = canonical.accounts.default;
+  return Boolean(defaultAccount?.apiKey?.trim());
+}
+
 function hasAccounts(accounts: Record<string, AccountConfig>): boolean {
   return Object.keys(accounts).length > 0;
 }
@@ -203,7 +313,7 @@ export function getPluginConfig(cfg?: OpenClawConfig, accountId = "default"): Pl
  * 列举账户 ID（过滤 enabled=false）
  */
 export function listAccountIds(cfg?: OpenClawConfig): string[] {
-  const { accounts } = normalizePluginConfigShape(cfg);
+  const { accounts } = getCanonicalPluginConfigShape(cfg);
 
   if (!hasAccounts(accounts)) {
     return ["default"];
@@ -220,7 +330,7 @@ export function listAccountIds(cfg?: OpenClawConfig): string[] {
  * 账户是否启用
  */
 export function isAccountEnabled(cfg?: OpenClawConfig, accountId = "default"): boolean {
-  const { accounts } = normalizePluginConfigShape(cfg);
+  const { accounts } = getCanonicalPluginConfigShape(cfg);
   if (!hasAccounts(accounts)) {
     return true;
   }
@@ -240,7 +350,7 @@ function isValidSessionKeyFormat(key?: string): boolean {
 
 export function validatePluginConfig(cfg?: OpenClawConfig): { ok: true } | { ok: false; errors: string[] } {
   const errors: string[] = [];
-  const { defaults, accounts } = normalizePluginConfigShape(cfg);
+  const { defaults, accounts } = getCanonicalPluginConfigShape(cfg);
 
   if (!hasAccounts(accounts)) {
     errors.push("至少需要一个账户配置（accounts.default）");

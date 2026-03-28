@@ -4,6 +4,8 @@
  * 负责从 Telegram Bot API 兼容格式的 update 中提取消息内容
  */
 
+import { sanitizeLogValue } from "./log-redaction.js";
+
 export type ChatType = "private" | "group";
 
 export interface ParsedMessage {
@@ -69,7 +71,9 @@ export function parseTelegramUpdate(
   
   // 调试：记录是否获取到 upload_api_url
   if (!uploadAPIURL) {
-    log?.warn?.(`[${accountId}] No upload_api_url found in chat object for update_id=${updateId}, chat=${JSON.stringify(update.message.chat)}`);
+    log?.warn?.(
+      `[${accountId}] No upload_api_url found in chat object for update_id=${updateId}, chat=${JSON.stringify(sanitizeLogValue(update.message.chat))}`,
+    );
   }
 
   // 提取媒体信息

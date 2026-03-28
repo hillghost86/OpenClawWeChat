@@ -4,7 +4,7 @@
  * 直接使用 sessionKey 作为 session（默认为 agent:main:main）
  */
 
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
 import { getPluginConfig } from "./config.js";
 import { DEFAULT_CONFIG } from "./constants.js";
 

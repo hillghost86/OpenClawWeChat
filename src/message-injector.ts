@@ -9,6 +9,7 @@ import { sendReply, ReplyConfig } from "./reply-sender.js";
 import { CHANNEL_ID, BRIDGE_URL } from "./constants.js";
 import { notifyTyping } from "./typing.js";
 import { resolveSession } from "./session.js";
+import { redactUploadApiUrl } from "./log-redaction.js";
 
 export interface MessageToInject {
   openid: string;
@@ -52,7 +53,9 @@ export async function injectMessage(
 
   // 记录 uploadAPIURL（用于调试）
   if (message.uploadAPIURL) {
-    log?.info?.(`[${config.accountId}] Injecting message with upload API URL: ${message.uploadAPIURL}`);
+    log?.info?.(
+      `[${config.accountId}] Injecting message with upload API URL: ${redactUploadApiUrl(message.uploadAPIURL)}`,
+    );
   } else {
     log?.warn?.(`[${config.accountId}] Injecting message without upload API URL (update_id=${message.updateId})`);
   }

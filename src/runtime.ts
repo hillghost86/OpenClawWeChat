@@ -4,7 +4,7 @@
  * 用于存储和访问 OpenClaw Plugin Runtime
  */
 
-import type { PluginRuntime } from "openclaw/plugin-sdk";
+import type { PluginRuntime } from "openclaw/plugin-sdk/core";
 
 let runtime: PluginRuntime | null = null;
 

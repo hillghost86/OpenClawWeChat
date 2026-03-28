@@ -2,7 +2,14 @@
 
 ## 📋 概述
 
-`config-init.js` 是一个交互式配置脚本，用于在安装插件后自动配置 OpenClawWeChat 插件，避免手动编辑 JSON 配置文件。
+`config-init.js` 是一个交互式 **CLI fallback / 迁移工具**，用于：
+
+- 在宿主界面暂未暴露 OpenClawWeChat 配置入口时完成初始化
+- 将旧配置迁移为 canonical 新结构
+- 维护多账户（新增 / 删除）
+- 避免手动编辑 JSON 配置文件
+
+> 推荐优先通过 **OpenClaw 插件 / 通道配置流程** 完成首次配置；本工具更适合作为迁移、CLI 配置和高级用户维护入口。
 
 ## 🔑 获取 API Key
 
@@ -16,7 +23,7 @@
 
 ## 🚀 快速开始
 
-### 推荐方式：使用 npm script
+### 使用 npm script
 
 #### macOS / Linux
 
@@ -70,6 +77,12 @@ node %USERPROFILE%\.openclaw\extensions\openclawwechat\scripts\config-init.js
    - 在现有配置基础上新增非 `default` 账户
 3. `删除 ApiKey`
    - 删除非 `default` 账户（`default` 不允许删除）
+
+脚本保存策略：
+
+- **读取**：兼容旧配置结构
+- **写入**：统一输出 canonical 新结构
+- **默认值**：默认值尽量不落盘，只保存用户自定义项
 
 输入规则：
 - API Key 格式必须为 `bot_id:secret`
@@ -205,6 +218,7 @@ New-Item -ItemType Directory -Force -Path $env:USERPROFILE\.openclaw
 - **扩容账户**：再次运行脚本，选择 `新增 ApiKey`
 - **下线账户**：选择 `删除 ApiKey`
 - **最小化配置**：默认值不写入配置文件，配置更简洁
+- **宿主配置优先**：后续如宿主内 setup 可用，优先走宿主配置入口
 
 ## 📚 相关文档
 

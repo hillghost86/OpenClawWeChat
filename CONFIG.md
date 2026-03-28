@@ -1,51 +1,68 @@
-# OpenClawWeChat 插件配置说明
+# OpenClawWeChat 配置说明
 
-## 📋 快速开始
+本文档是 OpenClawWeChat 插件的配置详解。快速上手请参见 [README.md](./README.md)。
 
-### 🔑 获取 API Key
+## 配置文件
 
-在开始配置之前，你需要先获取 API Key：
+- macOS / Linux：`~/.openclaw/openclaw.json`
+- Windows：`%USERPROFILE%\.openclaw\openclaw.json`
 
-1. 打开微信小程序 **ClawChat**
-2. 进入我的页面 APIKey管理  复制API Key 
-3. 找到并复制你的 API Key（格式：`bot_id:secret`）
+插件配置位于 `plugins.entries.openclawwechat.config` 下，使用 `defaults + accounts` 结构。
 
-> 💡 **提示：** API Key 是连接 OpenClaw 和微信小程序的凭证，请妥善保管。
+## 配置方式
 
-### 推荐方式：使用配置脚本（最简单）
+### 方式 1：OpenClaw 配置向导（推荐）
 
 ```bash
-npm run config-init
-# 或
-node scripts/config-init.js
+openclaw configure --section channels
 ```
 
-脚本会引导你完成配置，**只保存你自定义的配置项**，使用默认值的配置不会写入文件。
+选择 **OpenClawWeChat（微信小程序 ClawChat）**，按提示填写 API Key 等信息。向导会自动写入所有必要配置。
 
-### 手动配置
+> 当前向导仅支持 `default` 账户的初始化。多账户管理请使用方式 2。
 
-配置文件位置：`~/.openclaw/openclaw.json`
+### 方式 2：CLI 配置工具
 
-## ⚙️ 配置项说明
+适用于多账户管理、旧配置迁移、或向导不可用的场景。
 
-| 配置项 | 类型 | 必需 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `config.accounts.default.apiKey` | string | ✅ 是 | - | 默认账户 API Key（格式：`bot_id:secret`） |
-| `config.accounts.<id>.apiKey` | string | 多账户时 ✅ | - | 非 `default` 账户 API Key |
-| `config.accounts.<id>.sessionKey` | string | 非 `default` 账户 ✅ | - | 格式 `agent:<agentId>:<rest>`，且唯一 |
-| `config.defaults.pollIntervalMs` | number | ❌ 否 | `5000` | 默认轮询间隔（毫秒） |
-| `config.defaults.debug` | boolean | ❌ 否 | `false` | 默认调试开关 |
+**macOS / Linux**：
 
-**重要提示：**
-- ✅ **只配置需要自定义的项**，使用默认值的配置**不需要写入**配置文件
-- ✅ OpenClaw 会自动从插件清单中读取默认值
-- ✅ 配置文件更简洁，只显示你自定义的配置
+```bash
+cd ~/.openclaw/extensions/openclawwechat
+npm run config-init
+```
 
-## 📝 配置示例
+**Windows（CMD）**：
 
-### 最小配置（推荐，单账户）
+```cmd
+cd %USERPROFILE%\.openclaw\extensions\openclawwechat
+npm run config-init
+```
 
-如果你只配置 API Key，其他使用默认值：
+**Windows（PowerShell）**：
+
+```powershell
+cd "$env:USERPROFILE\.openclaw\extensions\openclawwechat"
+npm run config-init
+```
+
+支持三种操作模式：
+
+- **初始化/更新 ApiKey** — 配置或修改默认账户
+- **新增 ApiKey** — 添加额外账户（多 Bot 场景）
+- **删除 ApiKey** — 移除指定账户
+
+详细说明参见 [CONFIG-INIT.md](./CONFIG-INIT.md)。
+
+### 方式 3：手动编辑配置文件
+
+直接编辑 `~/.openclaw/openclaw.json`，参照下方示例填写。
+
+## 配置示例
+
+### 单账户（最小配置）
+
+只需填写 API Key，其余使用默认值：
 
 ```json
 {
@@ -56,19 +73,22 @@ node scripts/config-init.js
         "config": {
           "accounts": {
             "default": {
-              "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+              "apiKey": "20231227:YOUR_SECRET_KEY"
             }
           }
         }
       }
     }
+  },
+  "channels": {
+    "openclawwechat": {
+      "mode": "polling"
+    }
   }
 }
 ```
 
-### 自定义部分配置（修改默认轮询）
-
-如果你修改了轮询间隔：
+### 自定义轮询间隔
 
 ```json
 {
@@ -82,17 +102,22 @@ node scripts/config-init.js
           },
           "accounts": {
             "default": {
-              "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+              "apiKey": "20231227:YOUR_SECRET_KEY"
             }
           }
         }
       }
     }
+  },
+  "channels": {
+    "openclawwechat": {
+      "mode": "polling"
+    }
   }
 }
 ```
 
-### 多账户配置示例
+### 多账户
 
 ```json
 {
@@ -102,93 +127,113 @@ node scripts/config-init.js
         "enabled": true,
         "config": {
           "defaults": {
-            "pollIntervalMs": 3000,
-            "debug": true
+            "pollIntervalMs": 5000,
+            "debug": false
           },
           "accounts": {
             "default": {
-              "apiKey": "20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345"
+              "apiKey": "20231227:YOUR_DEFAULT_SECRET_KEY"
             },
             "bot2": {
-              "apiKey": "20231228:EXAMPLE_SECRET_KEY_35_CHARS_LONG_67890",
+              "apiKey": "20231236:YOUR_SECOND_SECRET_KEY",
               "sessionKey": "agent:main:wechat:bot2"
+            },
+            "bot3": {
+              "apiKey": "20231245:YOUR_THIRD_SECRET_KEY",
+              "sessionKey": "agent:main:wechat:bot3",
+              "pollIntervalMs": 10000,
+              "debug": true
             }
           }
         }
       }
     }
+  },
+  "channels": {
+    "openclawwechat": {
+      "mode": "polling"
+    }
   }
 }
 ```
 
-## 🔑 API Key 格式
+### 禁用某个账户（不删除配置）
 
-**获取方式：** API Key 需要从**微信小程序 ClawChat** 中获取。
-
-API Key 格式：`<bot_id>:<secret>`
-
-**示例：** `20231227:EXAMPLE_SECRET_KEY_35_CHARS_LONG_12345`
-
-- `bot_id`: 数字id
-- `secret`: 35 位随机字符串
-
-> 💡 **提示：** 打开微信小程序 ClawChat，在设置或账户页面可以找到你的 API Key。
-
-## 🔧 配置方法
-
-### 方法 1：使用配置脚本（推荐）
-
-```bash
-# 在插件目录下运行
-npm run config-init
-# 或
-node scripts/config-init.js
+```json
+"bot2": {
+  "apiKey": "20231236:YOUR_SECOND_SECRET_KEY",
+  "sessionKey": "agent:main:wechat:bot2",
+  "enabled": false
+}
 ```
 
-脚本会：
-- ✅ 交互式引导配置
-- ✅ 验证 API Key 格式
-- ✅ 校验多账户唯一性（apiKey/sessionKey）
-- ✅ 支持新增/删除 ApiKey 账户
-- ✅ 自动过滤默认值
-- ✅ 只保存你自定义的配置
+## 配置项参考
 
-### 方法 2：手动编辑配置文件
+### accounts（账户配置）
+
+| 字段 | 类型 | 必需 | 默认值 | 说明 |
+|---|---|:---:|---|---|
+| `apiKey` | `string` | 是 | — | ClawChat API Key，格式 `bot_id:secret` |
+| `sessionKey` | `string` | 非 default 时必填 | `agent:main:main` | 会话标识，格式 `agent:<agentId>:<rest>` |
+| `pollIntervalMs` | `number` | 否 | 继承 defaults | 该账户的轮询间隔（毫秒），覆盖全局默认值 |
+| `debug` | `boolean` | 否 | 继承 defaults | 该账户的调试日志开关，覆盖全局默认值 |
+| `enabled` | `boolean` | 否 | `true` | 设为 `false` 禁用该账户 |
+
+### defaults（全局默认配置）
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `pollIntervalMs` | `number` | `5000` | 轮询间隔（毫秒），范围 500–60000 |
+| `debug` | `boolean` | `false` | 调试日志开关 |
+
+### channels 通道标记
+
+| 字段 | 值 | 说明 |
+|---|---|---|
+| `channels.openclawwechat.mode` | `"polling"` | gateway 识别通道的必要标记 |
+
+> 使用配置向导或 CLI 工具会自动写入此标记。手动编辑配置时需自行添加。
+
+## 多账户规则
+
+- **`default` 账户**：无需配置 `sessionKey`，自动使用 `agent:main:main`
+- **非 `default` 账户**：必须配置唯一的 `sessionKey`
+- **sessionKey 推荐格式**：`agent:main:wechat:<accountId>`
+- **`apiKey` 不可重复**：每个账户的 API Key 必须唯一
+- **`sessionKey` 不可重复**：每个账户的 sessionKey 必须唯一
+- **账户级覆盖**：账户中的 `pollIntervalMs` 和 `debug` 会覆盖 `defaults` 中的值
+
+## API Key 格式
+
+格式：`<bot_id>:<secret>`
+
+- `bot_id`：数字 ID
+- `secret`：随机字符串
+
+**获取方式**：打开微信小程序 ClawChat → 我的 → Bot 管理 → 复制目标 Bot 的 API Key
+
+## 旧配置兼容
+
+插件支持读取以下历史配置结构，升级后无需手动迁移：
+
+- 新结构：`config.defaults` + `config.accounts`（推荐）
+- 单账户写法：`config.config.apiKey` 等平铺字段
+- 旧平铺结构：`config.apiKey` 等直接在 config 下
+- 极旧结构：字段直接在 `plugins.entries.openclawwechat` 下
+
+所有配置工具（向导、CLI、脚本）写入时统一使用 `defaults + accounts` 新结构。
+
+## 验证配置
 
 ```bash
-# 编辑配置文件
-nano ~/.openclaw/openclaw.json
-# 或
-code ~/.openclaw/openclaw.json
-```
-
-**提示：** 手动编辑时，只需添加需要自定义的配置项，默认值不需要写入。
-
-## ✅ 验证配置
-
-配置完成后，重启 OpenClaw Gateway：
-
-```bash
+openclaw config validate
 openclaw gateway restart
+openclaw plugins list
+openclaw logs --follow
 ```
 
-查看日志确认插件已加载：
+## 相关文档
 
-```bash
-openclaw logs --follow | grep "openclawwechat"
-```
-
-进入小程序，查看链接状态，或者测试发送。
-
-## 💡 配置最佳实践
-
-1. **使用配置脚本**：推荐使用 `config-init.js` 脚本，避免手动编辑错误
-2. **先初始化再扩容**：首次安装/升级先选“初始化/更新 ApiKey”，后续按需新增/删除
-3. **最小化配置**：只配置需要自定义的项，让配置文件保持简洁
-4. **默认值管理**：默认值由插件清单统一管理，未改动默认值时无需写入 `defaults`
-5. **配置验证**：配置脚本会自动验证 API Key、sessionKey 与唯一性
-
-## 📚 相关文档
-
-- [README.md](./README.md) - 插件使用说明（含安装指南）
-- [CONFIG-INIT.md](./CONFIG-INIT.md) - 配置脚本使用指南
+- [README.md](./README.md) — 快速上手
+- [CONFIG-INIT.md](./CONFIG-INIT.md) — CLI 配置工具说明
+- [CHANGELOG.md](./CHANGELOG.md) — 版本变更记录

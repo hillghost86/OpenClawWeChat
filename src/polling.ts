@@ -15,11 +15,12 @@
  * ```
  */
 
-import type { GatewayStartContext } from "openclaw/plugin-sdk";
+import type { GatewayStartContext } from "openclaw/plugin-sdk/core";
 import { parseTelegramUpdate } from "./message-parser.js";
 import { downloadMedia } from "./media-handler.js";
 import { injectMessage } from "./message-injector.js";
 import { DEFAULT_CONFIG, BRIDGE_URL } from "./constants.js";
+import { redactUploadApiUrl } from "./log-redaction.js";
 
 /** 插件日志接口：info/warn 仅在 debug 时输出，error 始终输出 */
 type PluginLog = {
@@ -213,6 +214,10 @@ export async function startPollingService(ctx: GatewayStartContext) {
   const config = account.config;
   const debug = config.debug ?? DEFAULT_CONFIG.debug;
   const log = wrapLogByDebug(rawLog, debug);
+  const setStatus =
+    typeof (ctx as { setStatus?: unknown }).setStatus === "function"
+      ? ((ctx as { setStatus: (patch: Record<string, unknown>) => void }).setStatus)
+      : undefined;
 
   log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram polling service`);
 
@@ -240,11 +245,13 @@ export async function startPollingService(ctx: GatewayStartContext) {
   }
 
   const encodedAPIKey = apiKey.replace(/:/g, "%3A");
+  const accountId = account.accountId;
 
   let offset = 0;
   let pollingTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   let accountBlocked = false;
+  let finished = false;
   const health: PollHealth = {
     pollCount: 0,
     successCount: 0,
@@ -268,6 +275,13 @@ export async function startPollingService(ctx: GatewayStartContext) {
     if (!abortSignal.aborted && !stopped && !accountBlocked) {
       pollingTimer = setTimeout(poll, delayMs);
     }
+  };
+
+  const emitStatus = (patch: Record<string, unknown>) => {
+    setStatus?.({
+      accountId,
+      ...patch,
+    });
   };
 
   /**
@@ -306,6 +320,12 @@ export async function startPollingService(ctx: GatewayStartContext) {
       }
       
       const data = await response.json();
+      emitStatus({
+        running: true,
+        connected: true,
+        lastEventAt: Date.now(),
+        lastError: null,
+      });
       
       if (data.result?.length === 0) {
         log?.info?.(`[${account.accountId}] Polling response: ok=${data.ok}, result.length=0`);
@@ -352,7 +372,9 @@ export async function startPollingService(ctx: GatewayStartContext) {
           
           // 记录 uploadAPIURL（用于调试）
           if (parsedMessage.uploadAPIURL) {
-            log?.info?.(`[${account.accountId}] Backend provided upload API URL: ${parsedMessage.uploadAPIURL}`);
+            log?.info?.(
+              `[${account.accountId}] Backend provided upload API URL: ${redactUploadApiUrl(parsedMessage.uploadAPIURL)}`,
+            );
           } else {
             log?.warn?.(`[${account.accountId}] No upload API URL provided for update_id=${parsedMessage.updateId}`);
           }
@@ -401,6 +423,13 @@ export async function startPollingService(ctx: GatewayStartContext) {
             );
             
             processedCount++;
+            emitStatus({
+              running: true,
+              connected: true,
+              lastInboundAt: Date.now(),
+              lastEventAt: Date.now(),
+              lastError: null,
+            });
           } catch (error) {
             log?.error?.(`[${account.accountId}] Failed to process message: update_id=${parsedMessage.updateId}, error=${error}`);
             // 继续处理其他消息，不中断轮询
@@ -432,6 +461,11 @@ export async function startPollingService(ctx: GatewayStartContext) {
 
       if (classified.stopAccount) {
         accountBlocked = true;
+        emitStatus({
+          running: false,
+          connected: false,
+          lastError: classified.message,
+        });
         log?.error?.(
           `[${account.accountId}] Polling stopped due to auth error (${classified.status ?? "unknown"}). Please check API Key.`,
         );
@@ -451,9 +485,20 @@ export async function startPollingService(ctx: GatewayStartContext) {
   };
   
   // 开始第一次轮询
+  emitStatus({
+    running: true,
+    connected: true,
+    lastStartAt: Date.now(),
+    lastStopAt: null,
+    lastError: null,
+  });
   poll();
   
   const cleanup = () => {
+    if (finished) {
+      return;
+    }
+    finished = true;
     stopped = true;
     accountBlocked = true;
     if (pollingTimer) {
@@ -461,16 +506,22 @@ export async function startPollingService(ctx: GatewayStartContext) {
       pollingTimer = null;
     }
     activeCleanupByAccount.delete(account.accountId);
+    emitStatus({
+      running: false,
+      connected: false,
+      lastStopAt: Date.now(),
+    });
     log?.info?.(`[${account.accountId}] Polling service cleaned up`);
   };
 
   activeCleanupByAccount.set(account.accountId, cleanup);
-
-  return {
-    running: true,
-    lastStartAt: Date.now(),
-    cleanup,
-  };
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      cleanup();
+      resolve();
+    };
+    abortSignal.addEventListener("abort", finish, { once: true });
+  });
 }
 
 /**

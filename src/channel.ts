@@ -17,11 +17,15 @@ import type {
   ChannelStatus,
   ChannelGateway,
   ChannelMeta,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/core";
 import { resolveMediaPath } from "./media-handler.js";
 import { getWechatMiniprogramRuntime } from "./runtime.js";
 import { startPollingService, runPollingCleanup } from "./polling.js";
 import { CHANNEL_ID, BRIDGE_URL } from "./constants.js";
+import {
+  wechatMiniprogramSetupAdapter,
+  wechatMiniprogramSetupWizard,
+} from "./setup-wizard.js";
 import {
   getPluginConfig,
   isConfigValid,
@@ -92,17 +96,23 @@ type SendContextLike = {
 type StatusSnapshotLike = {
   configured?: boolean;
   running?: boolean;
+  connected?: boolean;
   lastStartAt?: number | null;
   lastStopAt?: number | null;
+  lastEventAt?: number | null;
+  lastInboundAt?: number | null;
   lastError?: string | null;
 };
 
 // ==================== Meta 配置 ====================
 
 const meta: ChannelMeta = {
+  id: CHANNEL_ID,
   label: "OpenClawWeChat",
-  selectionLabel: "OpenClawWeChat",
-  blurb: "Bridge for OpenClaw to WeChat MiniProgram via HTTP polling",
+  selectionLabel: "OpenClawWeChat（微信小程序 ClawChat ）",
+  blurb: "通过ClawChat微信小程序，与OpenClaw进行双向通讯。",
+  docsPath: "/channels/openclawwechat",
+  docsLabel: "openclawwechat",
 };
 
 // ==================== Capabilities 配置 ====================
@@ -589,8 +599,11 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
   defaultRuntime: {
     accountId: "default",
     running: false,
+    connected: false,
     lastStartAt: null,
     lastStopAt: null,
+    lastEventAt: null,
+    lastInboundAt: null,
     lastError: null,
   },
   
@@ -600,8 +613,11 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
   buildChannelSummary: ({ snapshot }: { snapshot: StatusSnapshotLike }) => ({
     configured: snapshot.configured ?? false,
     running: snapshot.running ?? false,
+    connected: snapshot.connected ?? false,
     lastStartAt: snapshot.lastStartAt ?? null,
     lastStopAt: snapshot.lastStopAt ?? null,
+    lastEventAt: snapshot.lastEventAt ?? null,
+    lastInboundAt: snapshot.lastInboundAt ?? null,
     lastError: snapshot.lastError ?? null,
   }),
   
@@ -614,8 +630,11 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
       enabled: account.enabled,
       configured: isConfigValid(account.config as PluginConfig),
       running: runtime?.running ?? false,
+      connected: runtime?.connected ?? false,
       lastStartAt: runtime?.lastStartAt ?? null,
       lastStopAt: runtime?.lastStopAt ?? null,
+      lastEventAt: runtime?.lastEventAt ?? null,
+      lastInboundAt: runtime?.lastInboundAt ?? null,
       lastError: runtime?.lastError ?? null,
     };
   },
@@ -675,7 +694,13 @@ const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
 export const wechatMiniprogramPlugin: ChannelPlugin<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = {
   id: CHANNEL_ID,
   meta,
+  setup: wechatMiniprogramSetupAdapter,
+  setupWizard: wechatMiniprogramSetupWizard,
   capabilities,
+  reload: {
+    // 插件配置位于 plugins.entries.openclawwechat
+    configPrefixes: ["plugins.entries.openclawwechat"],
+  },
   config,
   inbound,
   outbound,

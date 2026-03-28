@@ -347,7 +347,7 @@ function isMigrationNeeded(config) {
   return normalizePluginPayload(config.plugins.entries[PLUGIN_ID]).migrationNeeded;
 }
 
-// 读取 package.json 获取版本信息
+// 读取 package.json 获取版本与 openclaw 元数据
 function readPackageInfo() {
   try {
     if (!fs.existsSync(PACKAGE_FILE)) {
@@ -357,13 +357,15 @@ function readPackageInfo() {
     const pkg = JSON.parse(content);
     return {
       name: pkg.name || PLUGIN_ID,
-      version: pkg.version || '1.0.0'
+      version: pkg.version || '1.0.0',
+      openclaw: typeof pkg.openclaw === 'object' && pkg.openclaw ? pkg.openclaw : {}
     };
   } catch (err) {
     printWarning(`读取 package.json 失败: ${err.message}，使用默认值`);
     return {
       name: PLUGIN_ID,
-      version: '1.0.0'
+      version: '1.0.0',
+      openclaw: {}
     };
   }
 }
@@ -392,8 +394,36 @@ function setPluginConfig(config, pluginConfig) {
   delete config.plugins.entries[PLUGIN_ID].sessionKey;
   delete config.plugins.entries[PLUGIN_ID].sessionKeyPrefix;
   delete config.plugins.entries[PLUGIN_ID].debug;
+
+  if (!config.channels || typeof config.channels !== 'object') {
+    config.channels = {};
+  }
+  config.channels[PLUGIN_ID] = {
+    ...(asObject(config.channels[PLUGIN_ID])),
+    mode: 'polling'
+  };
   
   return config;
+}
+
+function normalizeInstallMetadata(pkgInfo) {
+  const install = asObject(pkgInfo?.openclaw?.install);
+  const npmSpec = typeof install.npmSpec === 'string' && install.npmSpec.trim()
+    ? install.npmSpec.trim()
+    : (pkgInfo?.name || PLUGIN_ID);
+  const localPath = typeof install.localPath === 'string' && install.localPath.trim()
+    ? install.localPath.trim()
+    : `extensions/${PLUGIN_ID}`;
+  const defaultChoice = install.defaultChoice === 'local' ? 'local' : 'npm';
+  return {
+    npmSpec,
+    localPath,
+    defaultChoice
+  };
+}
+
+function resolveInstallRecordSource(defaultChoice) {
+  return defaultChoice === 'local' ? 'path' : 'npm';
 }
 
 // 设置插件安装记录
@@ -407,24 +437,27 @@ function setPluginInstallRecord(config) {
   
   // 读取 package.json 获取版本信息
   const pkgInfo = readPackageInfo();
-  const npmSpec = pkgInfo?.name || PLUGIN_ID;
+  const installMeta = normalizeInstallMetadata(pkgInfo);
+  const npmSpec = installMeta.npmSpec;
   const version = pkgInfo?.version || '1.0.0';
+  const installSource = resolveInstallRecordSource(installMeta.defaultChoice);
   
   // 检查插件目录是否存在
   const installPath = PLUGIN_DIR;
   const installPathExists = fs.existsSync(installPath);
   
-  // 如果插件目录存在，使用实际路径；否则使用相对路径
+  // 如果插件目录存在，使用实际路径；否则回退到 package metadata 中声明的 localPath
   const resolvedInstallPath = installPathExists 
     ? installPath 
-    : `~/.openclaw/extensions/${PLUGIN_ID}`;
+    : installMeta.localPath;
   
   config.plugins.installs[PLUGIN_ID] = {
-    source: 'npm',
+    source: installSource,
     spec: npmSpec,
     installPath: resolvedInstallPath,
     version: version,
-    installedAt: new Date().toISOString()
+    installedAt: new Date().toISOString(),
+    ...(installSource === 'path' ? { sourcePath: resolvedInstallPath } : {})
   };
   
   return config;
@@ -956,9 +989,9 @@ async function main() {
   const rl = createRL();
   
   try {
-    printHeader('╔════════════════════════════════════════╗');
-    printHeader('║   OpenClawWeChat 配置初始化脚本        ║');
-    printHeader('╚════════════════════════════════════════╝');
+      printHeader('╔════════════════════════════════════════════════╗');
+      printHeader('║   OpenClawWeChat 配置/迁移 CLI 工具            ║');
+      printHeader('╚════════════════════════════════════════════════╝');
     
     // 检查配置文件
     printInfo(`配置文件: ${CONFIG_FILE}`);
@@ -981,7 +1014,7 @@ async function main() {
     if (currentConfig) {
       printInfo('插件配置已存在');
       if (migrationNeeded) {
-        printWarning('检测到旧配置结构，将在本次保存时自动迁移到新结构（entries.<id>.config）');
+        printWarning('检测到旧配置结构，将在本次保存时自动迁移到 canonical 新结构（defaults + accounts）');
       }
       console.log('');
       printInfo('当前配置:');
@@ -995,7 +1028,7 @@ async function main() {
         return;
       }
     } else {
-      printInfo('插件配置不存在，将创建新配置');
+      printInfo('插件配置不存在，将创建新的 canonical 配置');
     }
     
     // 获取默认配置

@@ -1,4 +1,4 @@
-declare module "openclaw/plugin-sdk" {
+declare module "openclaw/plugin-sdk/core" {
   export type OpenClawConfig = any;
   export type PluginRuntime = any;
   export type OpenClawPluginApi = any;
@@ -11,4 +11,17 @@ declare module "openclaw/plugin-sdk" {
   export type ChannelStatus<TAccount = any, TProbe = any> = any;
   export type ChannelGateway<TAccount = any> = any;
   export type ChannelMeta = any;
+
+  export const defineChannelPluginEntry: any;
+  export const defineSetupPluginEntry: any;
+}
+
+declare module "openclaw/plugin-sdk/channel-setup" {
+  export type ChannelSetupWizard = any;
+}
+
+declare module "openclaw/plugin-sdk/setup" {
+  export type ChannelSetupAdapter = any;
+  export type ChannelSetupInput = any;
+  export const createStandardChannelSetupStatus: any;
 }
