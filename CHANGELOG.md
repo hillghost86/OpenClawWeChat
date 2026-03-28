@@ -5,6 +5,12 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [1.3.1] - 2026-03-28
+
+### 新增
+- 新增 `ensure-sentinel.ts`，插件被宿主加载时自动检查并补写 `channels.openclawwechat.mode = "polling"` 哨兵，解决从 1.2.x 升级后通道无法激活的问题
+
+
 ## [1.3.0] - 2026-03-28
 
 本版本完成与 OpenClaw 2026.3.24+ 官方插件系统的完整对齐，插件方式完全遵守openclaw官方要求，使用OpenClaw 官方 SDK 标准实现插件的所有功能。
