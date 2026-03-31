@@ -5,6 +5,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [1.3.2] - 2026-04-01
+
+### 修复
+- 修复 `channelConfigs.openclawwechat.schema` 未声明 `mode` 字段的问题，避免宿主在校验 `channels.openclawwechat.mode = "polling"` 哨兵时将其误判为非法额外属性
+
 ## [1.3.1] - 2026-03-28
 
 ### 新增
