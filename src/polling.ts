@@ -15,7 +15,8 @@
  * ```
  */
 
-import type { GatewayStartContext } from "openclaw/plugin-sdk/core";
+import type { ChannelGatewayContext, ChannelAccountSnapshot } from "openclaw/plugin-sdk/core";
+import type { WeChatMiniprogramAccount } from "./channel.js";
 import { parseTelegramUpdate } from "./message-parser.js";
 import { downloadMedia } from "./media-handler.js";
 import { injectMessage } from "./message-injector.js";
@@ -205,19 +206,17 @@ function classifyPollError(error: unknown): PollError {
 
 /**
  * 启动轮询服务
- * 
+ *
+ * 持续运行直到 ctx.abortSignal 触发才 resolve（无返回值）；
+ * 运行状态经 ctx.setStatus 上报，而非返回值。
+ *
  * @param ctx - Gateway 启动上下文
- * @returns 运行时状态
  */
-export async function startPollingService(ctx: GatewayStartContext) {
-  const { account, abortSignal, log: rawLog, deps } = ctx;
+export async function startPollingService(ctx: ChannelGatewayContext<WeChatMiniprogramAccount>) {
+  const { account, abortSignal, log: rawLog } = ctx;
   const config = account.config;
   const debug = config.debug ?? DEFAULT_CONFIG.debug;
   const log = wrapLogByDebug(rawLog, debug);
-  const setStatus =
-    typeof (ctx as { setStatus?: unknown }).setStatus === "function"
-      ? ((ctx as { setStatus: (patch: Record<string, unknown>) => void }).setStatus)
-      : undefined;
 
   log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram polling service`);
 
@@ -225,12 +224,6 @@ export async function startPollingService(ctx: GatewayStartContext) {
   const apiKey = config.apiKey;
   const pollInterval = config.pollIntervalMs ?? DEFAULT_CONFIG.pollIntervalMs;
   log?.info?.(`[${account.accountId}] Polling interval: ${pollInterval}ms`);
-
-  // 预先读取 Gateway 配置（用于 HTTP API 备选方案）
-  const gatewayConfig = deps?.config?.gateway || {};
-  const gatewayPort = gatewayConfig.port || 18789;
-  const gatewayToken = gatewayConfig.auth?.token || "";
-  log?.info?.(`[${account.accountId}] Gateway config: port=${gatewayPort}, token=${gatewayToken ? '***' + gatewayToken.slice(-4) : 'NOT FOUND'}`);
 
   if (!apiKey) {
     throw new Error("API Key not configured");
@@ -277,11 +270,11 @@ export async function startPollingService(ctx: GatewayStartContext) {
     }
   };
 
-  const emitStatus = (patch: Record<string, unknown>) => {
-    setStatus?.({
-      accountId,
-      ...patch,
-    });
+  // setStatus 的类型是完整 ChannelAccountSnapshot，但按部分 patch 上报即可：
+  // 宿主对传入值做合并处理（其自带插件的 status sink 同样只发部分 patch），
+  // abort 之后宿主可能过滤 running/connected 等字段，属预期行为。
+  const emitStatus = (patch: Partial<ChannelAccountSnapshot>) => {
+    ctx.setStatus({ accountId, ...patch });
   };
 
   /**

@@ -11,12 +11,15 @@
 
 import type {
   ChannelPlugin,
-  ChannelConfig,
-  ChannelInbound,
-  ChannelOutbound,
-  ChannelStatus,
-  ChannelGateway,
+  ChannelConfigAdapter,
+  ChannelOutboundAdapter,
+  ChannelStatusAdapter,
+  ChannelGatewayAdapter,
+  ChannelGatewayContext,
   ChannelMeta,
+  ChannelCapabilities,
+  ChannelAccountSnapshot,
+  OpenClawConfig,
 } from "openclaw/plugin-sdk/core";
 import { resolveMediaPath } from "./media-handler.js";
 import { getWechatMiniprogramRuntime } from "./runtime.js";
@@ -34,14 +37,13 @@ import {
   validatePluginConfig,
   type PluginConfig,
 } from "./config.js";
-import { resolveSession } from "./session.js";
 
 // ==================== 类型定义 ====================
 
 /**
  * 账户配置类型
  */
-interface WeChatMiniprogramAccount {
+export interface WeChatMiniprogramAccount {
   accountId: string;
   enabled: boolean;
     config: {
@@ -56,7 +58,7 @@ interface WeChatMiniprogramAccount {
 /**
  * 账户 Probe 类型（用于状态检查）
  */
-interface WeChatMiniprogramProbe {
+export interface WeChatMiniprogramProbe {
   ok: boolean;
   // 添加你的 Probe 字段
 }
@@ -67,41 +69,14 @@ type LoggerLike = {
   error?: (msg: string) => void;
 };
 
-type ReceiveMessageContextLike = {
-  message: {
-    from?: { id?: string | number; username?: string };
-    content?: string;
-    text?: string;
-    id?: string | number;
-    timestamp?: number;
-  };
-  accountId?: string;
-  deps?: {
-    runtime?: ReturnType<typeof getWechatMiniprogramRuntime>;
-    config?: unknown;
-  };
-  log?: LoggerLike;
-};
-
 type SendContextLike = {
   to: string;
   text?: string;
   mediaUrl?: string;
   accountId?: string;
-  cfg?: unknown;
+  cfg?: OpenClawConfig;
   replyToId?: string | number;
   log?: LoggerLike;
-};
-
-type StatusSnapshotLike = {
-  configured?: boolean;
-  running?: boolean;
-  connected?: boolean;
-  lastStartAt?: number | null;
-  lastStopAt?: number | null;
-  lastEventAt?: number | null;
-  lastInboundAt?: number | null;
-  lastError?: string | null;
 };
 
 // ==================== Meta 配置 ====================
@@ -117,7 +92,7 @@ const meta: ChannelMeta = {
 
 // ==================== Capabilities 配置 ====================
 
-const capabilities = {
+const capabilities: ChannelCapabilities = {
   chatTypes: ["direct", "group"],
   reactions: false,
   threads: false,
@@ -185,18 +160,18 @@ function looksLikeWeChatMiniprogramTargetId(raw: string, normalized?: string): b
 
 // ==================== Config 实现 ====================
 
-const config: ChannelConfig<WeChatMiniprogramAccount> = {
+const config: ChannelConfigAdapter<WeChatMiniprogramAccount> = {
   /**
    * 列出所有账户 ID
    */
-  listAccountIds: (cfg: unknown) => {
+  listAccountIds: (cfg: OpenClawConfig) => {
     return listAccountIdsFromConfig(cfg);
   },
 
   /**
    * 解析账户配置
    */
-  resolveAccount: (cfg: unknown, accountId: string) => {
+  resolveAccount: (cfg: OpenClawConfig, accountId: string) => {
     // 使用统一的配置读取函数
     const resolvedAccountId = accountId || "default";
     const pluginConfig = getPluginConfig(cfg, resolvedAccountId);
@@ -231,68 +206,13 @@ const config: ChannelConfig<WeChatMiniprogramAccount> = {
   }),
 };
 
-// ==================== Inbound 实现 ====================
-
-export const inbound: ChannelInbound<WeChatMiniprogramAccount> = {
-  /**
-   * 接收消息处理器
-   * 
-   * 当外部平台有新消息时，OpenClaw 会调用此方法
-   */
-  receiveMessage: async (ctx: ReceiveMessageContextLike) => {
-    const { message, accountId, deps } = ctx;
-    const runtime = deps?.runtime || getWechatMiniprogramRuntime();
-    const cfg = runtime.config?.loadConfig?.();
-    
-    const userMessage = {
-      openid: String(message.from?.id ?? message.from?.username ?? ""),
-      content: message.content || message.text,
-      messageId: message.id,
-      timestamp: message.timestamp || Date.now(),
-    };
-    
-    const resolvedAccountId = accountId || "default";
-    const pluginConfig = getPluginConfig(deps?.config, resolvedAccountId);
-    const sessionResult = resolveSession({
-      cfg: cfg || {},
-      apiKey: pluginConfig.apiKey || "",
-      accountId: resolvedAccountId,
-      openid: userMessage.openid,
-      runtime,
-    });
-    const sessionKey = sessionResult.sessionKey;
-    
-    // 3. 调用 OpenClaw Gateway API
-    try {
-      // 检查 runtime.gateway 是否存在
-      if (!runtime?.gateway?.call) {
-        ctx.log?.error?.(`Gateway API not available: runtime.gateway.call is missing`);
-        ctx.log?.error?.(`Runtime keys: ${Object.keys(runtime).join(', ')}`);
-        if (runtime?.gateway) {
-          ctx.log?.error?.(`Gateway keys: ${Object.keys(runtime.gateway).join(', ')}`);
-        }
-        throw new Error("Gateway API not available: runtime.gateway.call is missing");
-      }
-      
-      const result = await runtime.gateway.call('chat.send', {
-        sessionKey,
-        message: userMessage.content,
-      });
-      
-      return {
-        channel: CHANNEL_ID,
-        messageId: result.messageId || String(Date.now()),
-      };
-    } catch (error) {
-      ctx.log?.error?.(`Failed to send message to OpenClaw: ${error}`);
-      throw error;
-    }
-  },
-};
-
 // ==================== Outbound 实现 ====================
+//
+// 注：旧版的 `inbound.receiveMessage`（经 runtime.gateway.call('chat.send') 注入）已随
+// 2026.7.2 SDK 移除——新版 ChannelPlugin 无 inbound 字段；真实入站流是 gateway.startAccount
+// 启动的长轮询 → message-injector.injectMessage（经 runtime.channel.reply 注入 agent）。
 
-export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
+export const outbound: ChannelOutboundAdapter = {
   // 直接发送模式（不缓冲）
   deliveryMode: "direct",
   
@@ -592,7 +512,7 @@ export const outbound: ChannelOutbound<WeChatMiniprogramAccount> = {
 
 // ==================== Status 实现 ====================
 
-const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = {
+const status: ChannelStatusAdapter<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = {
   /**
    * 默认运行时状态
    */
@@ -610,7 +530,7 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
   /**
    * 构建通道摘要
    */
-  buildChannelSummary: ({ snapshot }: { snapshot: StatusSnapshotLike }) => ({
+  buildChannelSummary: ({ snapshot }: { snapshot: Partial<ChannelAccountSnapshot> }) => ({
     configured: snapshot.configured ?? false,
     running: snapshot.running ?? false,
     connected: snapshot.connected ?? false,
@@ -624,7 +544,7 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
   /**
    * 构建账户快照
    */
-  buildAccountSnapshot: ({ account, cfg: _cfg, runtime }: { account: WeChatMiniprogramAccount; cfg: unknown; runtime: StatusSnapshotLike }) => {
+  buildAccountSnapshot: ({ account, cfg: _cfg, runtime }: { account: WeChatMiniprogramAccount; cfg: unknown; runtime: Partial<ChannelAccountSnapshot> }) => {
     return {
       accountId: account.accountId,
       enabled: account.enabled,
@@ -642,14 +562,14 @@ const status: ChannelStatus<WeChatMiniprogramAccount, WeChatMiniprogramProbe> = 
 
 // ==================== Gateway 实现 ====================
 
-const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
+const gateway: ChannelGatewayAdapter<WeChatMiniprogramAccount> = {
   /**
    * 启动账户
-   * 
+   *
    * 当用户启用通道时，OpenClaw 会调用此方法
    * 启动轮询服务从中转服务器获取新消息
    */
-  startAccount: async (ctx: { account: WeChatMiniprogramAccount; cfg?: unknown; log?: LoggerLike }) => {
+  startAccount: async (ctx: ChannelGatewayContext<WeChatMiniprogramAccount>) => {
     const { account } = ctx;
     
     ctx.log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram account`);
@@ -675,17 +595,12 @@ const gateway: ChannelGateway<WeChatMiniprogramAccount> = {
    * 
    * 当用户禁用通道时，OpenClaw 会调用此方法
    */
-  stopAccount: async (ctx: { account: WeChatMiniprogramAccount; log?: LoggerLike }) => {
+  stopAccount: async (ctx: ChannelGatewayContext<WeChatMiniprogramAccount>) => {
     const { account } = ctx;
 
     ctx.log?.info?.(`[${account.accountId}] Stopping WeChat MiniProgram account`);
 
     runPollingCleanup(account.accountId);
-
-    return {
-      running: false,
-      lastStopAt: Date.now(),
-    };
   },
 };
 
@@ -702,7 +617,6 @@ export const wechatMiniprogramPlugin: ChannelPlugin<WeChatMiniprogramAccount, We
     configPrefixes: ["plugins.entries.openclawwechat"],
   },
   config,
-  inbound,
   outbound,
   status,
   gateway,

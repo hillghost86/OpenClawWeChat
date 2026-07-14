@@ -10,7 +10,7 @@
 import { defineChannelPluginEntry } from "openclaw/plugin-sdk/core";
 import { wechatMiniprogramPlugin } from "./src/channel.js";
 import { setWechatMiniprogramRuntime } from "./src/runtime.js";
-import { PLUGIN_ID, PLUGIN_VERSION } from "./src/constants.js";
+import { PLUGIN_ID } from "./src/constants.js";
 import { ensureChannelSentinel } from "./src/ensure-sentinel.js";
 
 const pluginConfigSchema = {
@@ -79,8 +79,7 @@ const plugin = defineChannelPluginEntry({
   setRuntime: setWechatMiniprogramRuntime,
 });
 
-// 同步版本号，便于在插件列表与调试信息中展示。
-(plugin as { version?: string }).version = PLUGIN_VERSION;
+// 插件展示版本以 openclaw.plugin.json（manifest）为准，宿主不读取导出对象上的 version 字段。
 
 // 插件被宿主加载时自动补写 channels sentinel，确保升级场景下通道能被正确激活。
 ensureChannelSentinel();
