@@ -15,7 +15,7 @@
  * ```
  */
 
-import type { GatewayStartContext } from "openclaw/plugin-sdk/core";
+import type { ChannelGatewayContext, ChannelAccountSnapshot } from "openclaw/plugin-sdk/core";
 import { parseTelegramUpdate } from "./message-parser.js";
 import { downloadMedia } from "./media-handler.js";
 import { injectMessage } from "./message-injector.js";
@@ -203,21 +203,28 @@ function classifyPollError(error: unknown): PollError {
   };
 }
 
+/** 轮询服务消费的账户子集（由 ChannelConfigAdapter.resolveAccount 解析得到）。 */
+type PollAccount = {
+  accountId: string;
+  config: {
+    apiKey?: string;
+    pollIntervalMs?: number;
+    debug?: boolean;
+    sessionKey?: string;
+  };
+};
+
 /**
  * 启动轮询服务
- * 
+ *
  * @param ctx - Gateway 启动上下文
  * @returns 运行时状态
  */
-export async function startPollingService(ctx: GatewayStartContext) {
-  const { account, abortSignal, log: rawLog, deps } = ctx;
+export async function startPollingService(ctx: ChannelGatewayContext<PollAccount>) {
+  const { account, abortSignal, log: rawLog } = ctx;
   const config = account.config;
   const debug = config.debug ?? DEFAULT_CONFIG.debug;
   const log = wrapLogByDebug(rawLog, debug);
-  const setStatus =
-    typeof (ctx as { setStatus?: unknown }).setStatus === "function"
-      ? ((ctx as { setStatus: (patch: Record<string, unknown>) => void }).setStatus)
-      : undefined;
 
   log?.info?.(`[${account.accountId}] Starting WeChat MiniProgram polling service`);
 
@@ -225,12 +232,6 @@ export async function startPollingService(ctx: GatewayStartContext) {
   const apiKey = config.apiKey;
   const pollInterval = config.pollIntervalMs ?? DEFAULT_CONFIG.pollIntervalMs;
   log?.info?.(`[${account.accountId}] Polling interval: ${pollInterval}ms`);
-
-  // 预先读取 Gateway 配置（用于 HTTP API 备选方案）
-  const gatewayConfig = deps?.config?.gateway || {};
-  const gatewayPort = gatewayConfig.port || 18789;
-  const gatewayToken = gatewayConfig.auth?.token || "";
-  log?.info?.(`[${account.accountId}] Gateway config: port=${gatewayPort}, token=${gatewayToken ? '***' + gatewayToken.slice(-4) : 'NOT FOUND'}`);
 
   if (!apiKey) {
     throw new Error("API Key not configured");
@@ -277,11 +278,10 @@ export async function startPollingService(ctx: GatewayStartContext) {
     }
   };
 
-  const emitStatus = (patch: Record<string, unknown>) => {
-    setStatus?.({
-      accountId,
-      ...patch,
-    });
+  // 新版 setStatus 期望完整的 ChannelAccountSnapshot（非任意 patch）：
+  // 先取回当前快照再覆盖，避免丢失既有字段。
+  const emitStatus = (patch: Partial<ChannelAccountSnapshot>) => {
+    ctx.setStatus({ ...ctx.getStatus(), accountId, ...patch });
   };
 
   /**
