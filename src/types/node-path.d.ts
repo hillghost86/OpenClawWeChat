@@ -4,8 +4,6 @@ declare module "node:path" {
     join(...parts: string[]): string;
     resolve(...parts: string[]): string;
     extname(p: string): string;
-    basename(p: string, ext?: string): string;
-    dirname(p: string): string;
   };
   export = path;
 }

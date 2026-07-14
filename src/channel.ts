@@ -17,6 +17,8 @@ import type {
   ChannelGatewayAdapter,
   ChannelGatewayContext,
   ChannelMeta,
+  ChannelCapabilities,
+  ChannelAccountSnapshot,
   OpenClawConfig,
 } from "openclaw/plugin-sdk/core";
 import { resolveMediaPath } from "./media-handler.js";
@@ -77,17 +79,6 @@ type SendContextLike = {
   log?: LoggerLike;
 };
 
-type StatusSnapshotLike = {
-  configured?: boolean;
-  running?: boolean;
-  connected?: boolean;
-  lastStartAt?: number | null;
-  lastStopAt?: number | null;
-  lastEventAt?: number | null;
-  lastInboundAt?: number | null;
-  lastError?: string | null;
-};
-
 // ==================== Meta 配置 ====================
 
 const meta: ChannelMeta = {
@@ -101,7 +92,7 @@ const meta: ChannelMeta = {
 
 // ==================== Capabilities 配置 ====================
 
-const capabilities = {
+const capabilities: ChannelCapabilities = {
   chatTypes: ["direct", "group"],
   reactions: false,
   threads: false,
@@ -539,7 +530,7 @@ const status: ChannelStatusAdapter<WeChatMiniprogramAccount, WeChatMiniprogramPr
   /**
    * 构建通道摘要
    */
-  buildChannelSummary: ({ snapshot }: { snapshot: StatusSnapshotLike }) => ({
+  buildChannelSummary: ({ snapshot }: { snapshot: Partial<ChannelAccountSnapshot> }) => ({
     configured: snapshot.configured ?? false,
     running: snapshot.running ?? false,
     connected: snapshot.connected ?? false,
@@ -553,7 +544,7 @@ const status: ChannelStatusAdapter<WeChatMiniprogramAccount, WeChatMiniprogramPr
   /**
    * 构建账户快照
    */
-  buildAccountSnapshot: ({ account, cfg: _cfg, runtime }: { account: WeChatMiniprogramAccount; cfg: unknown; runtime: StatusSnapshotLike }) => {
+  buildAccountSnapshot: ({ account, cfg: _cfg, runtime }: { account: WeChatMiniprogramAccount; cfg: unknown; runtime: Partial<ChannelAccountSnapshot> }) => {
     return {
       accountId: account.accountId,
       enabled: account.enabled,

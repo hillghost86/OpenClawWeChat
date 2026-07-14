@@ -270,9 +270,9 @@ export async function startPollingService(ctx: ChannelGatewayContext<WeChatMinip
     }
   };
 
-  // setStatus 的类型是完整 ChannelAccountSnapshot，但宿主 setRuntime 会把传入值
-  // 合并到既有快照（{...current, ...patch, accountId}），部分 patch 不会丢字段，
-  // 无需在插件侧先 getStatus() 再展开。
+  // setStatus 的类型是完整 ChannelAccountSnapshot，但按部分 patch 上报即可：
+  // 宿主对传入值做合并处理（其自带插件的 status sink 同样只发部分 patch），
+  // abort 之后宿主可能过滤 running/connected 等字段，属预期行为。
   const emitStatus = (patch: Partial<ChannelAccountSnapshot>) => {
     ctx.setStatus({ accountId, ...patch });
   };

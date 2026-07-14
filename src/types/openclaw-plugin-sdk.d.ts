@@ -50,7 +50,7 @@ declare module "openclaw/plugin-sdk/core" {
   };
 
   export type ChannelCapabilities = {
-    chatTypes: ReadonlyArray<ChatType | "thread" | string>;
+    chatTypes: ReadonlyArray<ChatType | "thread">;
     polls?: boolean;
     reactions?: boolean;
     edit?: boolean;
@@ -245,7 +245,7 @@ declare module "openclaw/plugin-sdk/core" {
   };
 
   // 真实返回是包装对象（openclaw src/plugin-sdk/core.ts DefinedChannelPluginEntry）：
-  // 插件自身字段嵌套在 channelPlugin 下，而非平铺；无 version 字段（index.ts 以断言追加）。
+  // 插件自身字段嵌套在 channelPlugin 下，而非平铺；无 version 字段（展示版本以 manifest 为准）。
   export type DefinedChannelPluginEntry<TPlugin> = {
     id: string;
     name: string;
@@ -259,8 +259,6 @@ declare module "openclaw/plugin-sdk/core" {
   export function defineChannelPluginEntry<TPlugin>(
     opts: DefineChannelPluginEntryOptions<TPlugin>,
   ): DefinedChannelPluginEntry<TPlugin>;
-
-  export const defineSetupPluginEntry: any;
 }
 
 declare module "openclaw/plugin-sdk/channel-setup" {
