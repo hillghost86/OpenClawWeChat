@@ -16,6 +16,7 @@
  */
 
 import type { ChannelGatewayContext, ChannelAccountSnapshot } from "openclaw/plugin-sdk/core";
+import type { WeChatMiniprogramAccount } from "./channel.js";
 import { parseTelegramUpdate } from "./message-parser.js";
 import { downloadMedia } from "./media-handler.js";
 import { injectMessage } from "./message-injector.js";
@@ -203,24 +204,15 @@ function classifyPollError(error: unknown): PollError {
   };
 }
 
-/** 轮询服务消费的账户子集（由 ChannelConfigAdapter.resolveAccount 解析得到）。 */
-type PollAccount = {
-  accountId: string;
-  config: {
-    apiKey?: string;
-    pollIntervalMs?: number;
-    debug?: boolean;
-    sessionKey?: string;
-  };
-};
-
 /**
  * 启动轮询服务
  *
+ * 持续运行直到 ctx.abortSignal 触发才 resolve（无返回值）；
+ * 运行状态经 ctx.setStatus 上报，而非返回值。
+ *
  * @param ctx - Gateway 启动上下文
- * @returns 运行时状态
  */
-export async function startPollingService(ctx: ChannelGatewayContext<PollAccount>) {
+export async function startPollingService(ctx: ChannelGatewayContext<WeChatMiniprogramAccount>) {
   const { account, abortSignal, log: rawLog } = ctx;
   const config = account.config;
   const debug = config.debug ?? DEFAULT_CONFIG.debug;
@@ -278,10 +270,11 @@ export async function startPollingService(ctx: ChannelGatewayContext<PollAccount
     }
   };
 
-  // 新版 setStatus 期望完整的 ChannelAccountSnapshot（非任意 patch）：
-  // 先取回当前快照再覆盖，避免丢失既有字段。
+  // setStatus 的类型是完整 ChannelAccountSnapshot，但宿主 setRuntime 会把传入值
+  // 合并到既有快照（{...current, ...patch, accountId}），部分 patch 不会丢字段，
+  // 无需在插件侧先 getStatus() 再展开。
   const emitStatus = (patch: Partial<ChannelAccountSnapshot>) => {
-    ctx.setStatus({ ...ctx.getStatus(), accountId, ...patch });
+    ctx.setStatus({ accountId, ...patch });
   };
 
   /**

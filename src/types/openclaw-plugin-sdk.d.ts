@@ -244,9 +244,21 @@ declare module "openclaw/plugin-sdk/core" {
     registerFull?: (api: OpenClawPluginApi) => void;
   };
 
+  // 真实返回是包装对象（openclaw src/plugin-sdk/core.ts DefinedChannelPluginEntry）：
+  // 插件自身字段嵌套在 channelPlugin 下，而非平铺；无 version 字段（index.ts 以断言追加）。
+  export type DefinedChannelPluginEntry<TPlugin> = {
+    id: string;
+    name: string;
+    description: string;
+    configSchema: unknown;
+    register: (api: OpenClawPluginApi) => void;
+    channelPlugin: TPlugin;
+    setChannelRuntime?: (runtime: PluginRuntime) => void;
+  };
+
   export function defineChannelPluginEntry<TPlugin>(
     opts: DefineChannelPluginEntryOptions<TPlugin>,
-  ): TPlugin & { version?: string; register: (api: OpenClawPluginApi) => unknown };
+  ): DefinedChannelPluginEntry<TPlugin>;
 
   export const defineSetupPluginEntry: any;
 }
